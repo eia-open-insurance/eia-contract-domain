@@ -1,13 +1,13 @@
 # eia-contract-domain
 
-- GitHub organization: `eia-platform`
-- Repository URL: https://github.com/eia-platform/eia-contract-domain
+- GitHub organization: `eia-open-insurance`
+- Repository URL: https://github.com/eia-open-insurance/eia-contract-domain
 - Type: Spring Boot service
 - Deployable: Yes
 - Owner: Contract
 - Runtime: Java 22 and Spring Boot
 - Data store: eia_contract (tx schema)
-- Depends on: eia-contract-expert, eia-contracts, eia-platform-libs
+- Depends on: eia-contract-expert, eia-contracts, eia-open-insurance-libs
 
 ## Purpose
 
@@ -34,3 +34,6 @@ Contract business rules, transaction catalog, orchestration, approvals, and APIs
 
 Owns the business logic for this vertical.
 
+## License
+
+Apache License 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
