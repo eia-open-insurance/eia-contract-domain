@@ -11,7 +11,7 @@
 
 ## Purpose
 
-Contract business rules, transaction catalog, orchestration, approvals, and APIs. Assumed reinsurance contract administration, layers, participations, accounts, and bordereaux.
+Contract business rules, transaction catalog, orchestration, approvals, and APIs. Reinsurance contract administration, layers, participations, accounts, and bordereaux.
 
 ## Responsibilities
 
