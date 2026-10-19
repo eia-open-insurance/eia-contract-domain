@@ -41,6 +41,19 @@ public class ApiExceptionHandler {
                 .body(new ApiError("CONCURRENT_MODIFICATION", ex.getMessage()));
     }
 
+    /** An aggregate invariant rejected the command (share total, tower, capacity, approval). */
+    @ExceptionHandler(ContractConflictException.class)
+    public ResponseEntity<ApiError> conflict(ContractConflictException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ApiError(ex.code(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiError> resourceNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError("NOT_FOUND", ex.getMessage()));
+    }
+
     @ExceptionHandler(ContractValidationException.class)
     public ResponseEntity<ApiError> validation(ContractValidationException ex) {
         return ResponseEntity.badRequest()

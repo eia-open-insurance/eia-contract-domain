@@ -168,7 +168,7 @@ class ContractControllerTest {
                         .header("X-EIA-Tenant", TENANT.toString())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"status": "BOUND", "expectedVersion": 0}
+                                {"status": "SIGNED", "expectedVersion": 0}
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("INVALID_STATUS_TRANSITION"))
@@ -220,5 +220,22 @@ class ContractControllerTest {
         mvc.perform(get("/api/v1/contracts").header("X-EIA-Tenant", TENANT.toString()))
                 .andExpect(status().isBadGateway())
                 .andExpect(jsonPath("$.code").value("EXPERT_UNAVAILABLE"));
+    }
+
+    /** SPEC 11.3.8: bind is a command with preconditions and approval, not a bare PATCH. */
+    @Test
+    void rejectsBoundTransitionThroughStatusPatch() throws Exception {
+        when(client.findById(TENANT, CONTRACT_ID)).thenReturn(contract("PLACED", 2));
+
+        mvc.perform(patch("/api/v1/contracts/{id}/status", CONTRACT_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "BOUND", "expectedVersion": 2}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("BIND_REQUIRES_COMMAND"));
+
+        verify(client, never()).updateStatus(any(), any(), any(), anyInt());
     }
 }

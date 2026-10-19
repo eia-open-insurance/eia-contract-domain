@@ -59,6 +59,11 @@ public class ContractController {
         ContractDto current = client.findById(tenantId, id);
         ContractStatus from = statusOfStored(current.status());
         ContractStatus target = parseStatus(command.status());
+        if (target == ContractStatus.BOUND) {
+            throw new ContractConflictException("BIND_REQUIRES_COMMAND",
+                    "Bind is a command: POST /api/v1/contracts/" + id + "/bind enforces the tower, "
+                            + "share, term, security and approval preconditions");
+        }
         if (!from.canTransitionTo(target)) {
             throw new InvalidStatusTransitionException(from, target);
         }
