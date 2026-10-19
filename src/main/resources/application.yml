@@ -1,0 +1,13 @@
+server:
+  port: 8086
+spring:
+  application:
+    name: eia-contract-domain
+eia:
+  contract:
+    expert-url: http://localhost:8085
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
