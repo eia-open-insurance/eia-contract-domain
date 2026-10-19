@@ -7,7 +7,7 @@
 - Owner: Contract
 - Runtime: Java 22 and Spring Boot
 - Data store: eia_contract (tx schema)
-- Depends on: eia-contract-expert, eia-contracts, eia-open-insurance-libs
+- Depends on: eia-contract-expert, eia-contracts, eia-platform/libs
 
 ## Purpose
 
