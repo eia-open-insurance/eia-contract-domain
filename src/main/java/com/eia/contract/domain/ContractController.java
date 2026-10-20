@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -36,6 +37,21 @@ public class ContractController {
     @GetMapping
     public List<ContractDto> list(@RequestHeader("X-EIA-Tenant") UUID tenantId) {
         return client.findAll(tenantId);
+    }
+
+    /**
+     * Shell global-search projection. The vertical is ASSUMED-only, so the book
+     * wall is enforced before the expert is called. A blank {@code q} returns
+     * the most recently updated contracts.
+     */
+    @GetMapping("/search")
+    public SearchResult search(@RequestHeader("X-EIA-Tenant") UUID tenantId,
+                               @RequestHeader(value = "X-EIA-Book", required = false) String bookHeader,
+                               @RequestParam(value = "q", required = false, defaultValue = "") String query,
+                               @RequestParam(value = "limit", required = false,
+                                       defaultValue = "10") int limit) {
+        requireAssumedBook(bookHeader);
+        return ContractSearch.search(tenantId, client.findAll(tenantId), query, limit);
     }
 
     @GetMapping("/{id}")
@@ -68,6 +84,16 @@ public class ContractController {
             throw new InvalidStatusTransitionException(from, target);
         }
         return client.updateStatus(tenantId, id, target, command.expectedVersion());
+    }
+
+    private static void requireAssumedBook(String raw) {
+        if (raw == null || raw.isBlank()) {
+            throw new ContractValidationException("BOOK_REQUIRED", "X-EIA-Book",
+                    "The X-EIA-Book header is required");
+        }
+        if (!"ASSUMED".equalsIgnoreCase(raw.trim())) {
+            throw new ContractBookScopeException();
+        }
     }
 
     private static ContractType parseContractType(String raw) {

@@ -11,13 +11,15 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 - Public APIs for layers, participants, terms, security, cessions, bordereaux,
   commutations (propose, approve, execute), bind eligibility, and bind under
   `/api/v1/contracts/{contractId}/...`.
+- `GET /api/v1/contracts/search` shell global-search projection with the common
+  `query`/`limit`/`items[]` shape, tenant scoping, and the ASSUMED book wall.
 - Domain command validation for every new resource, including the ASSUMED book
   wall, enumerations, money, percentages, currency, and date rules.
 - Expert error translation that preserves the structured `code` and status
   (404, 409, 400, 502).
 - `scripts/live-smoke.ps1`, a 41-check live PostgreSQL smoke covering create,
   layers, participants, bind, cession, capacity rejection, commutation, and close.
-- 81 JUnit tests.
+- 90 JUnit tests.
 
 ### Changed
 

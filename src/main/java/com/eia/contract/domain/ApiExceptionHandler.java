@@ -21,6 +21,12 @@ public class ApiExceptionHandler {
                 .body(new ApiError("NOT_FOUND", ex.getMessage()));
     }
 
+    @ExceptionHandler(ContractBookScopeException.class)
+    public ResponseEntity<ApiError> bookScope(ContractBookScopeException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ApiError("BOOK_SCOPE_VIOLATION", ex.getMessage()));
+    }
+
     @ExceptionHandler(DuplicateContractNumberException.class)
     public ResponseEntity<ApiError> duplicate(DuplicateContractNumberException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)

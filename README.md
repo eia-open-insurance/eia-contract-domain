@@ -21,6 +21,11 @@ The public API exposes the contract header and its children under
 (propose, approve, execute), `bind-eligibility`, and `bind`. All requests carry
 `X-EIA-Tenant`; money and percentages are decimal strings.
 
+`GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
+projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,
+`status`, `href`). It matches contract number or contract type, is tenant-scoped,
+and enforces the ASSUMED book wall.
+
 The domain validates every command, enforces the ASSUMED book wall, forwards to
 the expert, and preserves the expert's structured error codes for 400, 404, and
 409 responses. Binding requires the preconditions and an approver, so

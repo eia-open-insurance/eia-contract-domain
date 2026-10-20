@@ -9,6 +9,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -237,5 +238,165 @@ class ContractControllerTest {
                 .andExpect(jsonPath("$.code").value("BIND_REQUIRES_COMMAND"));
 
         verify(client, never()).updateStatus(any(), any(), any(), anyInt());
+    }
+
+    // ------------------------------------------------------------- search
+
+    private static final UUID OTHER_TENANT = UUID.fromString("99999999-9999-7999-8999-999999999999");
+
+    private static ContractDto searchContract(UUID id, UUID tenantId, String number, String type,
+                                              String status, Instant updatedAt) {
+        return new ContractDto(id, tenantId, number, type, CEDENT, REINSURER, status,
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 12, 31), "USD", 0, updatedAt, updatedAt);
+    }
+
+    private static List<ContractDto> latestContracts(int count) {
+        List<ContractDto> contracts = new ArrayList<>();
+        for (int index = 0; index < count; index++) {
+            contracts.add(searchContract(new UUID(0, index + 1), TENANT, "QS-2026-" + index,
+                    "QUOTA_SHARE", "DRAFT", NOW.plusSeconds(index * 60L)));
+        }
+        return contracts;
+    }
+
+    @Test
+    void searchMatchesContractNumberAndReturnsTheShellShape() throws Exception {
+        ContractDto match = searchContract(new UUID(0, 1), TENANT, "QS-2026-0001",
+                "QUOTA_SHARE", "DRAFT", NOW);
+        ContractDto other = searchContract(new UUID(0, 2), TENANT, "XOL-2026-0002",
+                "EXCESS_OF_LOSS", "BOUND", NOW.plusSeconds(60));
+        when(client.findAll(TENANT)).thenReturn(List.of(match, other));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "qs-2026")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.query").value("qs-2026"))
+                .andExpect(jsonPath("$.limit").value(10))
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(match.id().toString()))
+                .andExpect(jsonPath("$.items[0].type").value("CONTRACT"))
+                .andExpect(jsonPath("$.items[0].label").value("QS-2026-0001"))
+                .andExpect(jsonPath("$.items[0].secondary").value("QUOTA_SHARE · DRAFT"))
+                .andExpect(jsonPath("$.items[0].status").value("DRAFT"))
+                .andExpect(jsonPath("$.items[0].href").value("/contract?record=" + match.id()));
+    }
+
+    @Test
+    void searchMatchesContractTypeCaseInsensitively() throws Exception {
+        when(client.findAll(TENANT)).thenReturn(List.of(
+                searchContract(new UUID(0, 1), TENANT, "QS-2026-0001", "QUOTA_SHARE", "DRAFT", NOW),
+                searchContract(new UUID(0, 2), TENANT, "XOL-2026-0002", "EXCESS_OF_LOSS", "DRAFT", NOW)));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "quota_share")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].label").value("QS-2026-0001"));
+    }
+
+    @Test
+    void blankSearchReturnsTheLatestTenByUpdatedAt() throws Exception {
+        when(client.findAll(TENANT)).thenReturn(latestContracts(12));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "   ")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.query").value(""))
+                .andExpect(jsonPath("$.limit").value(10))
+                .andExpect(jsonPath("$.items.length()").value(10))
+                .andExpect(jsonPath("$.items[0].label").value("QS-2026-11"))
+                .andExpect(jsonPath("$.items[9].label").value("QS-2026-2"));
+    }
+
+    @Test
+    void searchHonoursAnExplicitLimit() throws Exception {
+        when(client.findAll(TENANT)).thenReturn(latestContracts(8));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "QS")
+                        .param("limit", "3")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limit").value(3))
+                .andExpect(jsonPath("$.items.length()").value(3))
+                .andExpect(jsonPath("$.items[0].label").value("QS-2026-7"));
+    }
+
+    @Test
+    void searchClampsLimitToTwentyFive() throws Exception {
+        when(client.findAll(TENANT)).thenReturn(latestContracts(30));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "QS")
+                        .param("limit", "100")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limit").value(25))
+                .andExpect(jsonPath("$.items.length()").value(25))
+                .andExpect(jsonPath("$.items[0].label").value("QS-2026-29"));
+    }
+
+    @Test
+    void searchClampsNonPositiveLimitToOne() throws Exception {
+        when(client.findAll(TENANT)).thenReturn(latestContracts(3));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "QS")
+                        .param("limit", "0")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.limit").value(1))
+                .andExpect(jsonPath("$.items.length()").value(1));
+    }
+
+    @Test
+    void searchIsTenantScoped() throws Exception {
+        ContractDto mine = searchContract(new UUID(0, 1), TENANT, "QS-2026-0001",
+                "QUOTA_SHARE", "DRAFT", NOW);
+        ContractDto foreign = searchContract(new UUID(0, 2), OTHER_TENANT, "QS-2026-0002",
+                "QUOTA_SHARE", "DRAFT", NOW.plusSeconds(60));
+        when(client.findAll(TENANT)).thenReturn(List.of(mine, foreign));
+
+        mvc.perform(get("/api/v1/contracts/search")
+                        .param("q", "QS-2026")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(1))
+                .andExpect(jsonPath("$.items[0].id").value(mine.id().toString()));
+
+        verify(client).findAll(TENANT);
+    }
+
+    @Test
+    void searchRequiresTheAssumedBook() throws Exception {
+        mvc.perform(get("/api/v1/contracts/search")
+                        .header("X-EIA-Tenant", TENANT.toString()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("BOOK_REQUIRED"));
+
+        verifyNoInteractions(client);
+    }
+
+    @Test
+    void searchHidesTheDirectBookAs404() throws Exception {
+        mvc.perform(get("/api/v1/contracts/search")
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "DIRECT"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOOK_SCOPE_VIOLATION"))
+                .andExpect(jsonPath("$.message")
+                        .value("Contract is an ASSUMED-only vertical; X-EIA-Book must be ASSUMED"));
+
+        verifyNoInteractions(client);
     }
 }

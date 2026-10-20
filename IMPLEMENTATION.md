@@ -7,11 +7,14 @@ codes.
 
 ## Implemented public API
 
-All paths are under `/api/v1/contracts/{contractId}` and require the
-`X-EIA-Tenant` header (SPEC 11.3.10 shape).
+All child paths are under `/api/v1/contracts/{contractId}` and require the
+`X-EIA-Tenant` header (SPEC 11.3.10 shape). The header paths
+`/api/v1/contracts`, `/api/v1/contracts/{id}`, and `/api/v1/contracts/search`
+require it as well.
 
 | Method | Path | Purpose |
 |---|---|---|
+| GET | `/api/v1/contracts/search` | Shell global search (ASSUMED book) |
 | GET | `/layers` | Layer tower |
 | GET | `/layers/summary` | Tower size, capacity, documented gaps |
 | POST | `/layers` | Record a layer |
@@ -46,10 +49,10 @@ preconditions and approval are enforced.
 
 ## Tests
 
-- `ContractControllerTest` (existing behaviour plus the bind-command guard),
-  `ContractDetailControllerTest` (every new endpoint, success and failure),
-  `ContractCommandRulesTest` (validation rules), `ContractStatusTest` — 81 tests,
-  run with `./gradlew test`.
+- `ContractControllerTest` (existing behaviour, the bind-command guard, and the
+  search projection), `ContractDetailControllerTest` (every new endpoint,
+  success and failure), `ContractCommandRulesTest` (validation rules),
+  `ContractStatusTest` — 90 tests, run with `./gradlew test`.
 
 ## Live smoke
 
