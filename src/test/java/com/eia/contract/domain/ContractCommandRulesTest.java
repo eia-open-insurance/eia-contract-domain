@@ -453,6 +453,156 @@ class ContractCommandRulesTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    void acceptsAValidCashCall() {
+        assertThatCode(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                "250000", "USD", LocalDate.of(2026, 4, 15))))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsCashCallWithoutPeriodStart() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                null, LocalDate.of(2026, 3, 31), "250000", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_START");
+    }
+
+    @Test
+    void rejectsCashCallWithoutPeriodEnd() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), null, "250000", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_END");
+    }
+
+    @Test
+    void rejectsCashCallWithAnEmptyPeriod() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1), "250000", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DATE_RANGE");
+    }
+
+    @Test
+    void rejectsCashCallWithAnInvertedPeriod() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 3, 31), LocalDate.of(2026, 1, 1), "250000", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DATE_RANGE");
+    }
+
+    @Test
+    void rejectsCashCallWithoutAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), null, "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsZeroCashCallAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "0", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsNegativeCashCallAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "-1", "USD",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsCashCallWithoutCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "250000", null,
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsLowercaseCashCallCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "250000", "usd",
+                LocalDate.of(2026, 4, 15))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsCashCallWithoutDueDate() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(cashCall(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "250000", "USD", null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DUE_DATE");
+    }
+
+    @Test
+    void rejectsOverlongCashCallNotes() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new CreateCashCallCommand(LocalDate.of(2026, 1, 1),
+                        LocalDate.of(2026, 3, 31), new BigDecimal("250000"), "USD",
+                        LocalDate.of(2026, 4, 15), "x".repeat(4001))))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_NOTES");
+    }
+
+    @Test
+    void rejectsAnUnknownCashCallStatus() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateCashCallStatusCommand("PAID")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void rejectsRequestedAsACashCallStatusTarget() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateCashCallStatusCommand("REQUESTED")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void acceptsACashCallStatusCaseInsensitively() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateCashCallStatusCommand("issued")))
+                .doesNotThrowAnyException();
+    }
+
+    private static CreateCashCallCommand cashCall(
+            LocalDate periodStart, LocalDate periodEnd, String amount, String currency,
+            LocalDate dueDate) {
+        return new CreateCashCallCommand(periodStart, periodEnd,
+                amount == null ? null : new BigDecimal(amount), currency, dueDate, null);
+    }
+
     private static CreateTechnicalAccountCommand technicalAccount(
             LocalDate periodStart, LocalDate periodEnd, String currency,
             String cededPremium, String cededLosses, String commission, String otherCharges) {

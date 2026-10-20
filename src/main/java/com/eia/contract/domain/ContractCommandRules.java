@@ -63,6 +63,8 @@ final class ContractCommandRules {
     static final Set<String> TECHNICAL_ACCOUNT_STATUSES = Set.of(
             "DRAFT", "ISSUED", "AGREED", "SETTLED", "DISPUTED", "SUPERSEDED");
 
+    static final Set<String> CASH_CALL_STATUSES = Set.of("ISSUED", "SETTLED", "CANCELLED");
+
     private ContractCommandRules() {
     }
 
@@ -228,6 +230,35 @@ final class ContractCommandRules {
 
     static void validate(UpdateTechnicalAccountStatusCommand command) {
         oneOf(TECHNICAL_ACCOUNT_STATUSES, command.status(), "status", true);
+    }
+
+    /**
+     * A cash call is a forward payment request on one contract period: the
+     * period must be complete and ordered, the amount is required and strictly
+     * positive, the currency must be an ISO code, and the due date is required.
+     * Call-number generation, the contract window, and the lifecycle are
+     * aggregate rules enforced by the expert (CTR-07, CTR-08, CASH-05).
+     */
+    static void validate(CreateCashCallCommand command) {
+        required(command.periodStart(), "periodStart");
+        required(command.periodEnd(), "periodEnd");
+        if (command.periodStart() != null && command.periodEnd() != null
+                && !command.periodEnd().isAfter(command.periodStart())) {
+            throw new ContractValidationException("INVALID_DATE_RANGE", "periodEnd",
+                    "periodEnd must be after periodStart");
+        }
+        BigDecimal amount = money(command.amount(), "amount", true);
+        if (amount.signum() == 0) {
+            throw new ContractValidationException("INVALID_AMOUNT", "amount",
+                    "amount must be greater than zero");
+        }
+        requiredCurrency(command.currency(), "currency");
+        required(command.dueDate(), "dueDate");
+        text(command.notes(), "notes", 4000);
+    }
+
+    static void validate(UpdateCashCallStatusCommand command) {
+        oneOf(CASH_CALL_STATUSES, command.status(), "status", true);
     }
 
     private static String oneOf(Set<String> allowed, String raw, String field, boolean required) {

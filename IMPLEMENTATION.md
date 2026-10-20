@@ -27,6 +27,8 @@ require it as well.
 | PATCH | `/bordereaux/{bordereauId}/status` | Process or fail a bordereau (`PROCESSED`, `FAILED`) |
 | GET/POST | `/technical-accounts` | Technical accounts / produce an account |
 | PATCH | `/technical-accounts/{accountId}/status` | Change the account lifecycle status |
+| GET/POST | `/cash-calls` | Cash calls / request an interim cash call |
+| PATCH | `/cash-calls/{cashCallId}/status` | Issue, settle, or cancel a cash call |
 | GET/POST | `/commutations` | Commutations |
 | POST | `/commutations/{commutationId}/approve` | Record approval |
 | POST | `/commutations/{commutationId}/execute` | Execute, release security, close |
@@ -48,6 +50,14 @@ preconditions and approval are enforced.
   on every expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as
   404 `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
   the other contract proxy routes.
+- Cash-call calls follow the same book wall and forward the tenant and ASSUMED
+  book. A cash call records `periodStart`, `periodEnd`, `amount`, `currency`,
+  `dueDate`, and optional `notes`; the amount must be strictly positive, the
+  period ordered, the currency an ISO code, and the due date present. The expert
+  assigns the call number and starts the call `REQUESTED`; the domain accepts
+  only `ISSUED`, `SETTLED`, or `CANCELLED` as a status target. The client uses
+  the expert's `/internal/v1/contracts/{contractId}/cash-calls` API, which maps
+  to the same controller as the public cash-call path.
 - The period-bordereau client uses the expert's public
   `/api/v1/contracts/{contractId}/bordereaux` API, where the legacy internal
   prefix remains reserved for the ingest-header slice. A bordereau is created
@@ -67,6 +77,9 @@ preconditions and approval are enforced.
   `TechnicalAccountControllerTest` (technical-account proxy and book wall),
   `TechnicalAccountClientTest` (tenant and ASSUMED forwarding plus expert
   400/404/409 preservation with `MockRestServiceServer`),
+  `CashCallControllerTest` (cash-call proxy and book wall),
+  `CashCallClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
+  preservation with `MockRestServiceServer`),
   `ContractCommandRulesTest` (validation rules), `ContractStatusTest` — run with
   `./gradlew test`.
 
