@@ -25,6 +25,8 @@ require it as well.
 | GET/POST | `/cessions` | Cessions |
 | GET/POST | `/bordereaux` | Bordereaux |
 | GET | `/bordereaux/{bordereauId}` | One bordereau |
+| GET/POST | `/technical-accounts` | Technical accounts / produce an account |
+| PATCH | `/technical-accounts/{accountId}/status` | Change the account lifecycle status |
 | GET/POST | `/commutations` | Commutations |
 | POST | `/commutations/{commutationId}/approve` | Record approval |
 | POST | `/commutations/{commutationId}/execute` | Execute, release security, close |
@@ -42,6 +44,10 @@ preconditions and approval are enforced.
 - Command shape validation: required fields, enumerations, non-negative money,
   percentages in 0..100, ISO currency format, date ordering, and the ASSUMED book
   wall (`sourceVertical` must be `ASSUMED`). Errors are 400 with a specific code.
+- Technical-account calls forward the tenant and the ASSUMED book on every
+  expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as 404
+  `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
+  the other contract proxy routes.
 - Expert error translation: 404 -> `NOT_FOUND`, 409 -> the expert's code (409),
   400 -> the expert's code (400), 5xx/unreachable -> 502 `EXPERT_UNAVAILABLE`.
 - The aggregate invariants themselves (share totals, tower overlap, capacity,
@@ -51,8 +57,11 @@ preconditions and approval are enforced.
 
 - `ContractControllerTest` (existing behaviour, the bind-command guard, and the
   search projection), `ContractDetailControllerTest` (every new endpoint,
-  success and failure), `ContractCommandRulesTest` (validation rules),
-  `ContractStatusTest` — 90 tests, run with `./gradlew test`.
+  success and failure), `TechnicalAccountControllerTest` (technical-account
+  proxy and book wall), `TechnicalAccountClientTest` (tenant and ASSUMED
+  forwarding plus expert 400/404/409 preservation with
+  `MockRestServiceServer`), `ContractCommandRulesTest` (validation rules),
+  `ContractStatusTest` — run with `./gradlew test`.
 
 ## Live smoke
 
@@ -71,7 +80,7 @@ schema and the invariant mapping.
 ## Remaining gaps
 
 The domain does not yet implement: draft update (`PATCH /contracts/{id}`),
-endorse, renew, technical accounts, reinstatement application, loss-aggregate,
+endorse, renew, reinstatement application, loss-aggregate,
 documents, lineage, mass-tort profile, authority limits, calculations and test
 vectors (SPEC 7.19), Schedule F, or reinsurance tax. Events are not published.
 The public error body remains the vertical `ApiError` rather than the canonical

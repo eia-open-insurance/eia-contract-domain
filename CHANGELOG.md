@@ -9,10 +9,14 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 ### Added
 
 - Public APIs for layers, participants, terms, security, cessions, bordereaux,
-  commutations (propose, approve, execute), bind eligibility, and bind under
+  commutations (propose, approve, execute), technical accounts (list, produce,
+  change status), bind eligibility, and bind under
   `/api/v1/contracts/{contractId}/...`.
 - `GET /api/v1/contracts/search` shell global-search projection with the common
   `query`/`limit`/`items[]` shape, tenant scoping, and the ASSUMED book wall.
+- Technical-account proxy forwards the tenant and the ASSUMED book to the
+  expert on every call and preserves the expert's `400`/`404`/`409` code and
+  message; a supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`.
 - Domain command validation for every new resource, including the ASSUMED book
   wall, enumerations, money, percentages, currency, and date rules.
 - Expert error translation that preserves the structured `code` and status

@@ -66,6 +66,9 @@ final class ContractCommandRules {
     static final Set<String> COMMUTATION_BASES = Set.of(
             "NEGOTIATED", "CONTRACTUAL", "INDUCED", "REGULATORY", "INSOLVENCY");
 
+    static final Set<String> TECHNICAL_ACCOUNT_STATUSES = Set.of(
+            "DRAFT", "ISSUED", "AGREED", "SETTLED", "DISPUTED", "SUPERSEDED");
+
     private ContractCommandRules() {
     }
 
@@ -194,6 +197,32 @@ final class ContractCommandRules {
         }
     }
 
+    /**
+     * Producing an account stays within the ASSUMED treaty: the period must be
+     * complete and ordered, currency must be present and an ISO code, and every
+     * monetary component is required and non-negative. Period overlap, the
+     * contract window, and the balance reconciliation are aggregate rules
+     * enforced by the expert (CTR-07, CTR-08, CTR-17).
+     */
+    static void validate(CreateTechnicalAccountCommand command) {
+        required(command.periodStart(), "periodStart");
+        required(command.periodEnd(), "periodEnd");
+        if (command.periodStart() != null && command.periodEnd() != null
+                && !command.periodEnd().isAfter(command.periodStart())) {
+            throw new ContractValidationException("INVALID_DATE_RANGE", "periodEnd",
+                    "periodEnd must be after periodStart");
+        }
+        requiredCurrency(command.currency(), "currency");
+        money(command.cededPremium(), "cededPremium", true);
+        money(command.cededLosses(), "cededLosses", true);
+        money(command.commission(), "commission", true);
+        money(command.otherCharges(), "otherCharges", true);
+    }
+
+    static void validate(UpdateTechnicalAccountStatusCommand command) {
+        oneOf(TECHNICAL_ACCOUNT_STATUSES, command.status(), "status", true);
+    }
+
     private static String oneOf(Set<String> allowed, String raw, String field, boolean required) {
         if (blank(raw)) {
             if (required) {
@@ -254,6 +283,13 @@ final class ContractCommandRules {
         if (!raw.trim().matches("[A-Z]{3}")) {
             throw invalid(field, field + " must be a three-letter uppercase ISO currency code");
         }
+    }
+
+    private static void requiredCurrency(String raw, String field) {
+        if (blank(raw)) {
+            throw invalid(field, field + " is required");
+        }
+        currency(raw, field);
     }
 
     private static void text(String raw, String field, int max) {

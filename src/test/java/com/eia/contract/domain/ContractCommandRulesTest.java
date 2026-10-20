@@ -238,4 +238,115 @@ class ContractCommandRulesTest {
                 .extracting(ex -> ((ContractValidationException) ex).code())
                 .isEqualTo("INVALID_EXPECTED_VERSION");
     }
+
+    @Test
+    void acceptsAValidTechnicalAccount() {
+        assertThatCode(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "USD",
+                "400000", "240000", "100000", "5000"))).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsAnEmptyTechnicalAccountPeriod() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 1, 1), "USD",
+                "1", "1", "1", "1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DATE_RANGE");
+    }
+
+    @Test
+    void rejectsTechnicalAccountWithoutAmounts() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "USD",
+                null, null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CEDED_PREMIUM");
+    }
+
+    @Test
+    void rejectsTechnicalAccountWithoutAPeriodStart() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                null, LocalDate.of(2026, 3, 31), "USD", "1", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_START");
+    }
+
+    @Test
+    void rejectsTechnicalAccountWithoutAPeriodEnd() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), null, "USD", "1", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_END");
+    }
+
+    @Test
+    void rejectsTechnicalAccountWithAnInvertedPeriod() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 3, 31), LocalDate.of(2026, 1, 1), "USD",
+                "1", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DATE_RANGE");
+    }
+
+    @Test
+    void rejectsTechnicalAccountWithoutCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), null,
+                "1", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsLowercaseTechnicalAccountCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "usd",
+                "1", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsNegativeTechnicalAccountMoney() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(technicalAccount(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "USD",
+                "1", "-1", "1", "1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CEDED_LOSSES");
+    }
+
+    @Test
+    void rejectsAnUnknownTechnicalAccountStatus() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateTechnicalAccountStatusCommand("PAID")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void acceptsAValidTechnicalAccountStatus() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateTechnicalAccountStatusCommand("disputed")))
+                .doesNotThrowAnyException();
+    }
+
+    private static CreateTechnicalAccountCommand technicalAccount(
+            LocalDate periodStart, LocalDate periodEnd, String currency,
+            String cededPremium, String cededLosses, String commission, String otherCharges) {
+        return new CreateTechnicalAccountCommand(periodStart, periodEnd, currency,
+                cededPremium == null ? null : new BigDecimal(cededPremium),
+                cededLosses == null ? null : new BigDecimal(cededLosses),
+                commission == null ? null : new BigDecimal(commission),
+                otherCharges == null ? null : new BigDecimal(otherCharges));
+    }
 }

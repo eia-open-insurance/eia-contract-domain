@@ -18,8 +18,13 @@ Contract business rules, transaction catalog, orchestration, approvals, and APIs
 The public API exposes the contract header and its children under
 `/api/v1/contracts/{contractId}`: `layers`, `participants`, `terms` (plus
 `terms/requirements`), `security`, `cessions`, `bordereaux`, `commutations`
-(propose, approve, execute), `bind-eligibility`, and `bind`. All requests carry
-`X-EIA-Tenant`; money and percentages are decimal strings.
+(propose, approve, execute), `technical-accounts` (list, produce, change status),
+`bind-eligibility`, and `bind`. All requests carry `X-EIA-Tenant`; money and
+percentages are decimal strings.
+
+Technical-account calls also forward the tenant and the ASSUMED book to the
+expert (`X-EIA-Tenant` and `X-EIA-Book: ASSUMED`); a supplied `X-EIA-Book` other
+than ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`.
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,
