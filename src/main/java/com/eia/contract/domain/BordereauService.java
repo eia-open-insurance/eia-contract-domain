@@ -23,10 +23,6 @@ public class BordereauService {
         return client.findAll(tenantId, contractId);
     }
 
-    public Bordereau findOne(UUID tenantId, UUID contractId, UUID bordereauId) {
-        return client.findOne(tenantId, contractId, bordereauId);
-    }
-
     public Bordereau create(UUID tenantId, UUID contractId, CreateBordereauCommand command) {
         return client.create(tenantId, contractId, command);
     }

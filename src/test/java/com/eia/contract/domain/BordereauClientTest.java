@@ -35,9 +35,8 @@ class BordereauClientTest {
             UUID.fromString("aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa");
     private static final String BASE = "http://expert.test";
     private static final String BORDEREAUX =
-            BASE + "/internal/v1/contracts/" + CONTRACT_ID + "/bordereaux";
-    private static final String ONE = BORDEREAUX + "/" + BORDEREAU_ID;
-    private static final String STATUS = ONE + "/status";
+            BASE + "/api/v1/contracts/" + CONTRACT_ID + "/bordereaux";
+    private static final String STATUS = BORDEREAUX + "/" + BORDEREAU_ID + "/status";
 
     @Test
     void listsBordereauxForwardingTenantAndAssumedBook() {
@@ -71,25 +70,6 @@ class BordereauClientTest {
         assertThat(bordereau.status()).isEqualTo("RECEIVED");
         assertThat(bordereau.technicalAccountId()).isEqualTo(TECHNICAL_ACCOUNT_ID);
         assertThat(bordereau.createdAt()).isEqualTo(Instant.parse("2026-04-02T09:30:00Z"));
-        server.verify();
-    }
-
-    @Test
-    void findsOneBordereauForwardingTenantAndAssumedBook() {
-        RestClient.Builder builder = builder();
-        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        BordereauClient client = new BordereauClient(builder, new ObjectMapper(), BASE);
-
-        server.expect(requestTo(ONE + "?tenantId=" + TENANT))
-                .andExpect(method(HttpMethod.GET))
-                .andExpect(header(BordereauClient.TENANT_HEADER, TENANT.toString()))
-                .andExpect(header(BordereauClient.BOOK_HEADER, "ASSUMED"))
-                .andRespond(withSuccess(bordereauJson(), MediaType.APPLICATION_JSON));
-
-        Bordereau bordereau = client.findOne(TENANT, CONTRACT_ID, BORDEREAU_ID);
-
-        assertThat(bordereau.bordereauId()).isEqualTo(BORDEREAU_ID);
-        assertThat(bordereau.bordereauNumber()).isEqualTo("BRD-2026-000412");
         server.verify();
     }
 
@@ -138,15 +118,15 @@ class BordereauClientTest {
                 .andExpect(header(BordereauClient.TENANT_HEADER, TENANT.toString()))
                 .andExpect(header(BordereauClient.BOOK_HEADER, "ASSUMED"))
                 .andExpect(content().json("""
-                        {"status": "POSTED", "notes": "Posted to TA-2026-00077"}
+                        {"status": "PROCESSED", "notes": "Posted to TA-2026-00077"}
                         """))
-                .andRespond(withSuccess(bordereauJson().replace("\"RECEIVED\"", "\"POSTED\""),
+                .andRespond(withSuccess(bordereauJson().replace("\"RECEIVED\"", "\"PROCESSED\""),
                         MediaType.APPLICATION_JSON));
 
         Bordereau bordereau = client.updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID,
-                new UpdateBordereauStatusCommand("POSTED", "Posted to TA-2026-00077"));
+                new UpdateBordereauStatusCommand("PROCESSED", "Posted to TA-2026-00077"));
 
-        assertThat(bordereau.status()).isEqualTo("POSTED");
+        assertThat(bordereau.status()).isEqualTo("PROCESSED");
         server.verify();
     }
 
@@ -184,18 +164,18 @@ class BordereauClientTest {
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
         BordereauClient client = new BordereauClient(builder, new ObjectMapper(), BASE);
 
-        server.expect(requestTo(ONE + "?tenantId=" + TENANT))
+        server.expect(requestTo(BORDEREAUX + "?tenantId=" + TENANT))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("""
                                 {"code": "NOT_FOUND",
-                                 "message": "Bordereau bbbbbbbb was not found"}
+                                 "message": "Contract 22222222 was not found"}
                                 """));
 
-        assertThatThrownBy(() -> client.findOne(TENANT, CONTRACT_ID, BORDEREAU_ID))
+        assertThatThrownBy(() -> client.findAll(TENANT, CONTRACT_ID))
                 .isInstanceOf(ResourceNotFoundException.class)
-                .hasMessageContaining("bbbbbbbb");
+                .hasMessageContaining("22222222");
         server.verify();
     }
 
@@ -210,17 +190,17 @@ class BordereauClientTest {
                 .andRespond(withStatus(HttpStatus.CONFLICT)
                         .contentType(MediaType.APPLICATION_JSON)
                         .body("""
-                                {"code": "INVALID_BORDEREAU_TRANSITION",
-                                 "message": "Bordereau BRD-2026-000412 cannot move from RECEIVED to POSTED"}
+                                {"code": "INVALID_STATUS_TRANSITION",
+                                 "message": "Bordereau status cannot move from RECEIVED to PROCESSED"}
                                 """));
 
         assertThatThrownBy(() -> client.updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID,
-                new UpdateBordereauStatusCommand("POSTED", null)))
+                new UpdateBordereauStatusCommand("PROCESSED", null)))
                 .isInstanceOf(ContractConflictException.class)
                 .satisfies(ex -> {
                     ContractConflictException conflict = (ContractConflictException) ex;
-                    assertThat(conflict.code()).isEqualTo("INVALID_BORDEREAU_TRANSITION");
-                    assertThat(conflict.getMessage()).contains("RECEIVED to POSTED");
+                    assertThat(conflict.code()).isEqualTo("INVALID_STATUS_TRANSITION");
+                    assertThat(conflict.getMessage()).contains("RECEIVED to PROCESSED");
                 });
         server.verify();
     }

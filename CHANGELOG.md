@@ -19,7 +19,8 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`. The
   projection carries the period, receipt date, currency, premium, loss,
   commission, other charges, line count, notes, lifecycle status, and the
-  linked technical account.
+  linked technical account. A bordereau is created `RECEIVED` and can move only
+  to `PROCESSED` or `FAILED`.
 - Technical-account proxy forwards the tenant and the ASSUMED book to the
   expert on every call and preserves the expert's `400`/`404`/`409` code and
   message; a supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`.
@@ -29,7 +30,7 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   (404, 409, 400, 502).
 - `scripts/live-smoke.ps1`, a 41-check live PostgreSQL smoke covering create,
   layers, participants, bind, cession, capacity rejection, commutation, and close.
-- 158 JUnit tests.
+- 160 JUnit tests.
 
 ### Changed
 

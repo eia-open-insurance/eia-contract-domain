@@ -27,7 +27,8 @@ book to the expert (`X-EIA-Tenant` and `X-EIA-Book: ASSUMED`); a supplied
 `X-EIA-Book` other than ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`. A
 bordereau records `periodStart`, `periodEnd`, `receivedDate`, `currency`,
 `premiumAmount`, `lossAmount`, `commissionAmount`, `otherChargesAmount`,
-`lineCount`, and optional `notes`.
+`lineCount`, and optional `notes`; it starts `RECEIVED` and its status then
+moves only to `PROCESSED` or `FAILED`.
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,

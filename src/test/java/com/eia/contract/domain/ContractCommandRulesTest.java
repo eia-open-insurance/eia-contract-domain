@@ -261,10 +261,26 @@ class ContractCommandRulesTest {
     }
 
     @Test
-    void acceptsAValidBordereauStatus() {
+    void acceptsProcessedBordereauStatus() {
         assertThatCode(() -> ContractCommandRules.validate(
-                new UpdateBordereauStatusCommand("posted", "Posted to TA-2026-00077")))
+                new UpdateBordereauStatusCommand("processed", "Posted to TA-2026-00077")))
                 .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsFailedBordereauStatus() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateBordereauStatusCommand("FAILED", "Missing lines")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsReceivedAsABordereauStatusTarget() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateBordereauStatusCommand("RECEIVED", null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
     }
 
     @Test

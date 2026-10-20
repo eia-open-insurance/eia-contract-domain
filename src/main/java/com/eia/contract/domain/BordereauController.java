@@ -43,15 +43,6 @@ public class BordereauController {
         return service.findAll(tenantId, contractId);
     }
 
-    @GetMapping("/{bordereauId}")
-    public Bordereau get(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                         @RequestHeader(value = "X-EIA-Book", required = false) String book,
-                         @PathVariable UUID contractId,
-                         @PathVariable UUID bordereauId) {
-        requireAssumedBookWhenPresent(book);
-        return service.findOne(tenantId, contractId, bordereauId);
-    }
-
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public Bordereau create(@RequestHeader("X-EIA-Tenant") UUID tenantId,

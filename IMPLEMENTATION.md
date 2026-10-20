@@ -24,8 +24,7 @@ require it as well.
 | GET/POST | `/security` | Security and collateral |
 | GET/POST | `/cessions` | Cessions |
 | GET/POST | `/bordereaux` | Bordereaux / record a received bordereau |
-| GET | `/bordereaux/{bordereauId}` | One bordereau |
-| PATCH | `/bordereaux/{bordereauId}/status` | Change the bordereau lifecycle status |
+| PATCH | `/bordereaux/{bordereauId}/status` | Process or fail a bordereau (`PROCESSED`, `FAILED`) |
 | GET/POST | `/technical-accounts` | Technical accounts / produce an account |
 | PATCH | `/technical-accounts/{accountId}/status` | Change the account lifecycle status |
 | GET/POST | `/commutations` | Commutations |
@@ -49,6 +48,10 @@ preconditions and approval are enforced.
   on every expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as
   404 `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
   the other contract proxy routes.
+- The period-bordereau client uses the expert's public
+  `/api/v1/contracts/{contractId}/bordereaux` API, where the legacy internal
+  prefix remains reserved for the ingest-header slice. A bordereau is created
+  `RECEIVED`; the domain accepts only `PROCESSED` or `FAILED` as a status target.
 - Expert error translation: 404 -> `NOT_FOUND`, 409 -> the expert's code (409),
   400 -> the expert's code (400), 5xx/unreachable -> 502 `EXPERT_UNAVAILABLE`.
 - The aggregate invariants themselves (share totals, tower overlap, capacity,

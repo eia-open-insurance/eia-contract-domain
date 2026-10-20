@@ -52,8 +52,7 @@ final class ContractCommandRules {
 
     static final Set<String> CESSION_STATUSES = Set.of("RECORDED", "CONFIRMED", "REVERSED", "DISPUTED");
 
-    static final Set<String> BORDEREAU_STATUSES = Set.of(
-            "RECEIVED", "PARSING", "VALIDATED", "PARTIALLY_POSTED", "POSTED", "REJECTED", "SUPERSEDED");
+    static final Set<String> BORDEREAU_STATUSES = Set.of("RECEIVED", "PROCESSED", "FAILED");
 
     static final Set<String> COMMUTATION_TYPES = Set.of(
             "FULL", "PARTIAL", "LOSS_PORTFOLIO", "BUYOUT", "NOVATION");
@@ -172,12 +171,16 @@ final class ContractCommandRules {
         money(command.commissionAmount(), "commissionAmount", true);
         money(command.otherChargesAmount(), "otherChargesAmount", true);
         integer(command.lineCount(), "lineCount", 0, 10_000_000, true);
-        text(command.notes(), "notes", 400);
+        text(command.notes(), "notes", 4000);
     }
 
     static void validate(UpdateBordereauStatusCommand command) {
-        oneOf(BORDEREAU_STATUSES, command.status(), "status", true);
-        text(command.notes(), "notes", 400);
+        String status = oneOf(BORDEREAU_STATUSES, command.status(), "status", true);
+        if ("RECEIVED".equals(status)) {
+            throw new ContractValidationException("INVALID_STATUS", "status",
+                    "Only PROCESSED and FAILED can be requested; RECEIVED is the creation state");
+        }
+        text(command.notes(), "notes", 4000);
     }
 
     static void validate(ContractCommands.CreateCommutation command) {

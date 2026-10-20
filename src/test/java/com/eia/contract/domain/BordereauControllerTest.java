@@ -68,18 +68,6 @@ class BordereauControllerTest {
     }
 
     @Test
-    void returnsOneBordereau() throws Exception {
-        when(service.findOne(TENANT, CONTRACT_ID, BORDEREAU_ID)).thenReturn(bordereau("RECEIVED"));
-
-        mvc.perform(get(BASE + "/{bordereauId}", CONTRACT_ID, BORDEREAU_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .header("X-EIA-Book", "ASSUMED"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.bordereauId").value(BORDEREAU_ID.toString()))
-                .andExpect(jsonPath("$.bordereauNumber").value("BRD-2026-000412"));
-    }
-
-    @Test
     void recordsBordereau() throws Exception {
         CreateBordereauCommand command = new CreateBordereauCommand(
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
@@ -112,36 +100,56 @@ class BordereauControllerTest {
     @Test
     void changesBordereauStatus() throws Exception {
         UpdateBordereauStatusCommand command =
-                new UpdateBordereauStatusCommand("POSTED", "Posted to TA-2026-00077");
+                new UpdateBordereauStatusCommand("PROCESSED", "Posted to TA-2026-00077");
         when(service.updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID, command))
-                .thenReturn(bordereau("POSTED"));
+                .thenReturn(bordereau("PROCESSED"));
 
         mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
                         .header("X-EIA-Book", "ASSUMED")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"status": "POSTED", "notes": "Posted to TA-2026-00077"}
+                                {"status": "PROCESSED", "notes": "Posted to TA-2026-00077"}
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bordereauId").value(BORDEREAU_ID.toString()))
-                .andExpect(jsonPath("$.status").value("POSTED"));
+                .andExpect(jsonPath("$.status").value("PROCESSED"));
+
+        verify(service).updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID, command);
+    }
+
+    @Test
+    void changesBordereauStatusToFailed() throws Exception {
+        UpdateBordereauStatusCommand command =
+                new UpdateBordereauStatusCommand("FAILED", "Missing lines");
+        when(service.updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID, command))
+                .thenReturn(bordereau("FAILED"));
+
+        mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "FAILED", "notes": "Missing lines"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("FAILED"));
 
         verify(service).updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID, command);
     }
 
     @Test
     void changesBordereauStatusWithoutNotes() throws Exception {
-        UpdateBordereauStatusCommand command = new UpdateBordereauStatusCommand("POSTED", null);
+        UpdateBordereauStatusCommand command = new UpdateBordereauStatusCommand("PROCESSED", null);
         when(service.updateStatus(TENANT, CONTRACT_ID, BORDEREAU_ID, command))
-                .thenReturn(bordereau("POSTED"));
+                .thenReturn(bordereau("PROCESSED"));
 
         mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\": \"POSTED\"}"))
+                        .content("{\"status\": \"PROCESSED\"}"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("POSTED"));
+                .andExpect(jsonPath("$.status").value("PROCESSED"));
     }
 
     @Test
@@ -308,6 +316,18 @@ class BordereauControllerTest {
     }
 
     @Test
+    void rejectsReceivedAsAStatusTarget() throws Exception {
+        mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RECEIVED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
     void rejectsAnEmptyStatus() throws Exception {
         mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
@@ -321,18 +341,18 @@ class BordereauControllerTest {
     void preservesTheExpertConflictProblem() throws Exception {
         when(service.updateStatus(eq(TENANT), eq(CONTRACT_ID), eq(BORDEREAU_ID),
                 any(UpdateBordereauStatusCommand.class)))
-                .thenThrow(new ContractConflictException("INVALID_BORDEREAU_TRANSITION",
-                        "Bordereau BRD-2026-000412 cannot move from RECEIVED to POSTED"));
+                .thenThrow(new ContractConflictException("INVALID_STATUS_TRANSITION",
+                        "Bordereau status cannot move from RECEIVED to PROCESSED"));
 
         mvc.perform(patch(BASE + "/{bordereauId}/status", CONTRACT_ID, BORDEREAU_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
                         .header("X-EIA-Book", "ASSUMED")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"status\": \"POSTED\"}"))
+                        .content("{\"status\": \"PROCESSED\"}"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("INVALID_BORDEREAU_TRANSITION"))
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS_TRANSITION"))
                 .andExpect(jsonPath("$.message").value(
-                        "Bordereau BRD-2026-000412 cannot move from RECEIVED to POSTED"));
+                        "Bordereau status cannot move from RECEIVED to PROCESSED"));
     }
 
     @Test

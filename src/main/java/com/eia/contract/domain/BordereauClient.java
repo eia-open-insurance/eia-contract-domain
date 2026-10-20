@@ -29,8 +29,9 @@ public class BordereauClient {
     public static final String BOOK_HEADER = "X-EIA-Book";
     public static final String TENANT_HEADER = "X-EIA-Tenant";
 
-    private static final String BASE_PATH = "/internal/v1/contracts/{contractId}/bordereaux";
-    private static final String ONE_PATH = BASE_PATH + "/{bordereauId}";
+    // The expert exposes the period-bordereau API on its public contract path;
+    // the internal prefix stays reserved for the legacy ingest header slice.
+    private static final String BASE_PATH = "/api/v1/contracts/{contractId}/bordereaux";
     private static final String STATUS_PATH = BASE_PATH + "/{bordereauId}/status";
     private static final ParameterizedTypeReference<List<Bordereau>> BORDEREAUX =
             new ParameterizedTypeReference<>() {};
@@ -53,26 +54,6 @@ public class BordereauClient {
                     .retrieve()
                     .body(BORDEREAUX);
             return bordereaux == null ? List.of() : bordereaux;
-        } catch (RestClientResponseException ex) {
-            throw translate(ex);
-        } catch (ResourceAccessException ex) {
-            throw unavailable(ex);
-        }
-    }
-
-    public Bordereau findOne(UUID tenantId, UUID contractId, UUID bordereauId) {
-        try {
-            Bordereau bordereau = client.get()
-                    .uri(uri -> uri.path(ONE_PATH).queryParam("tenantId", tenantId)
-                            .build(contractId, bordereauId))
-                    .header(TENANT_HEADER, tenantId.toString())
-                    .header(BOOK_HEADER, BOOK)
-                    .retrieve()
-                    .body(Bordereau.class);
-            if (bordereau == null) {
-                throw new ExpertIntegrationException("Contract expert returned an empty body", null);
-            }
-            return bordereau;
         } catch (RestClientResponseException ex) {
             throw translate(ex);
         } catch (ResourceAccessException ex) {
