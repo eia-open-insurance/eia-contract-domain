@@ -67,13 +67,6 @@ class ContractDetailControllerTest {
                 "FOLLOW_THE_SETTLEMENTS", NOW, NOW);
     }
 
-    private static ContractResources.Security security() {
-        return new ContractResources.Security(UUID.randomUUID(), TENANT, CONTRACT_ID,
-                "LETTER_OF_CREDIT", new BigDecimal("5000000.0000"), new BigDecimal("5000000.0000"),
-                "USD", PARTY, null, LocalDate.of(2026, 1, 1), null, LocalDate.of(2027, 1, 1),
-                "OUTSTANDING", "CASH", null, null, null, null, NOW, NOW);
-    }
-
     private static ContractResources.Cession cession() {
         return new ContractResources.Cession(UUID.randomUUID(), TENANT, CONTRACT_ID, null,
                 "CES-2026-00001", "ASSUMED", "CLAIM", "POL-2026-0001", "CLM-2026-0007",
@@ -330,65 +323,6 @@ class ContractDetailControllerTest {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
-    }
-
-    // -------------------------------------------------------------- security
-
-    @Test
-    void listsSecurity() throws Exception {
-        when(client.findSecurity(TENANT, CONTRACT_ID)).thenReturn(List.of(security()));
-
-        mvc.perform(get("/api/v1/contracts/{id}/security", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].securityType").value("LETTER_OF_CREDIT"))
-                .andExpect(jsonPath("$[0].heldAmount").value("5000000.0000"));
-    }
-
-    @Test
-    void createsSecurity() throws Exception {
-        when(client.createSecurity(eq(TENANT), eq(CONTRACT_ID),
-                any(ContractCommands.CreateSecurity.class))).thenReturn(security());
-
-        mvc.perform(post("/api/v1/contracts/{id}/security", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"securityType": "LETTER_OF_CREDIT", "requiredAmount": "5000000",
-                                 "heldAmount": "5000000"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("OUTSTANDING"));
-    }
-
-    @Test
-    void rejectsSecurityWithoutRequiredAmount() throws Exception {
-        mvc.perform(post("/api/v1/contracts/{id}/security", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"securityType": "LETTER_OF_CREDIT"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REQUIRED_AMOUNT"));
-    }
-
-    @Test
-    void mapsCollateralAboveObligationConflictFromTheExpert() throws Exception {
-        when(client.createSecurity(eq(TENANT), eq(CONTRACT_ID),
-                any(ContractCommands.CreateSecurity.class)))
-                .thenThrow(new ContractConflictException("COLLATERAL_EXCEEDS_OBLIGATION",
-                        "Held collateral 7500000.0000 exceeds the secured obligation 5000000.0000"));
-
-        mvc.perform(post("/api/v1/contracts/{id}/security", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"securityType": "LETTER_OF_CREDIT", "requiredAmount": "5000000",
-                                 "heldAmount": "7500000"}
-                                """))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.code").value("COLLATERAL_EXCEEDS_OBLIGATION"));
     }
 
     // -------------------------------------------------------------- cessions

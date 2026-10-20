@@ -46,10 +46,10 @@ preconditions and approval are enforced.
 - Command shape validation: required fields, enumerations, non-negative money,
   percentages in 0..100, ISO currency format, date ordering, and the ASSUMED book
   wall (`sourceVertical` must be `ASSUMED`). Errors are 400 with a specific code.
-- Technical-account and bordereau calls forward the tenant and the ASSUMED book
-  on every expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as
-  404 `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
-  the other contract proxy routes.
+- Technical-account, bordereau, cash-call, and security calls forward the tenant
+  and the ASSUMED book on every expert call. A supplied `X-EIA-Book` other than
+  ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`; an absent header is accepted
+  for compatibility with the other contract proxy routes.
 - Cash-call calls follow the same book wall and forward the tenant and ASSUMED
   book. A cash call records `periodStart`, `periodEnd`, `amount`, `currency`,
   `dueDate`, and optional `notes`; the amount must be strictly positive, the
@@ -58,6 +58,15 @@ preconditions and approval are enforced.
   only `ISSUED`, `SETTLED`, or `CANCELLED` as a status target. The client uses
   the expert's `/internal/v1/contracts/{contractId}/cash-calls` API, which maps
   to the same controller as the public cash-call path.
+- Security calls use the same book wall and forward the tenant and ASSUMED book
+  to the expert's `/internal/v1/contracts/{contractId}/security` API. A security
+  record carries `securityType`, `requiredAmount`, `heldAmount`, `currency`,
+  `providerPartyId`, `expiryDate`, and `approvalRef`; the `SecurityRecord`
+  projection returns the id, those fields, `status`, and `createdAt`. The type is
+  an enumeration, the amounts are non-negative, the currency is an ISO code, and
+  the approval reference is at most 64 characters. Currency reconciliation, the
+  over-collateralisation approval, the effective dates, and the initial status
+  stay in the expert and surface as 409.
 - The period-bordereau client uses the expert's public
   `/api/v1/contracts/{contractId}/bordereaux` API, where the legacy internal
   prefix remains reserved for the ingest-header slice. A bordereau is created
@@ -79,6 +88,9 @@ preconditions and approval are enforced.
   400/404/409 preservation with `MockRestServiceServer`),
   `CashCallControllerTest` (cash-call proxy and book wall),
   `CashCallClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
+  preservation with `MockRestServiceServer`),
+  `SecurityControllerTest` (security proxy, book wall, and command validation),
+  `SecurityClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
   preservation with `MockRestServiceServer`),
   `ContractCommandRulesTest` (validation rules), `ContractStatusTest` — run with
   `./gradlew test`.

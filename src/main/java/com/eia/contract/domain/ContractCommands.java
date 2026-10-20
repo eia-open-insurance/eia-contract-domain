@@ -62,24 +62,6 @@ public final class ContractCommands {
             String sourceClause
     ) {}
 
-    public record CreateSecurity(
-            String securityType,
-            BigDecimal requiredAmount,
-            BigDecimal heldAmount,
-            String currency,
-            UUID providerPartyId,
-            UUID beneficiaryPartyId,
-            LocalDate effectiveFrom,
-            LocalDate effectiveTo,
-            LocalDate expiryDate,
-            String status,
-            String collateralQuality,
-            UUID documentId,
-            String releaseConditions,
-            String approvalRef,
-            Instant approvedAt
-    ) {}
-
     public record CreateCession(
             UUID layerId,
             String cessionNumber,

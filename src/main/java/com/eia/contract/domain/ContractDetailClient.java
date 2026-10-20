@@ -28,8 +28,6 @@ public class ContractDetailClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ContractResources.Term>> TERMS =
             new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<List<ContractResources.Security>> SECURITY =
-            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ContractResources.Cession>> CESSIONS =
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ContractResources.Commutation>> COMMUTATIONS =
@@ -82,16 +80,6 @@ public class ContractDetailClient {
                                              ContractCommands.CreateTerm command) {
         return post("/internal/v1/contracts/{contractId}/terms", tenantId, command,
                 ContractResources.Term.class, contractId);
-    }
-
-    public List<ContractResources.Security> findSecurity(UUID tenantId, UUID contractId) {
-        return getList("/internal/v1/contracts/{contractId}/security", tenantId, SECURITY, contractId);
-    }
-
-    public ContractResources.Security createSecurity(UUID tenantId, UUID contractId,
-                                                     ContractCommands.CreateSecurity command) {
-        return post("/internal/v1/contracts/{contractId}/security", tenantId, command,
-                ContractResources.Security.class, contractId);
     }
 
     public List<ContractResources.Cession> findCessions(UUID tenantId, UUID contractId) {

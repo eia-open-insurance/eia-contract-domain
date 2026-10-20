@@ -106,13 +106,14 @@ final class ContractCommandRules {
         text(command.sourceClause(), "sourceClause", 48);
     }
 
-    static void validate(ContractCommands.CreateSecurity command) {
+    static void validate(CreateSecurityCommand command) {
         oneOf(SECURITY_TYPES, command.securityType(), "securityType", true);
         money(command.requiredAmount(), "requiredAmount", true);
         money(command.heldAmount(), "heldAmount", false);
         currency(command.currency(), "currency");
         oneOf(SECURITY_STATUSES, command.status(), "status", false);
         oneOf(COLLATERAL_QUALITIES, command.collateralQuality(), "collateralQuality", false);
+        text(command.approvalRef(), "approvalRef", 64);
         dateRange(command.effectiveFrom(), command.effectiveTo());
         if (command.expiryDate() != null && command.effectiveFrom() != null
                 && command.expiryDate().isBefore(command.effectiveFrom())) {

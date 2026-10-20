@@ -79,29 +79,6 @@ public final class ContractResources {
             Instant updatedAt
     ) {}
 
-    public record Security(
-            UUID id,
-            UUID tenantId,
-            UUID contractId,
-            String securityType,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal requiredAmount,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal heldAmount,
-            String currency,
-            UUID providerPartyId,
-            UUID beneficiaryPartyId,
-            LocalDate effectiveFrom,
-            LocalDate effectiveTo,
-            LocalDate expiryDate,
-            String status,
-            String collateralQuality,
-            UUID documentId,
-            String releaseConditions,
-            String approvalRef,
-            Instant approvedAt,
-            Instant createdAt,
-            Instant updatedAt
-    ) {}
-
     public record Cession(
             UUID id,
             UUID tenantId,

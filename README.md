@@ -23,17 +23,20 @@ produce, change status), `cash-calls` (list, request, change status),
 `bind-eligibility`, and `bind`. All requests carry `X-EIA-Tenant`; money and
 percentages are decimal strings.
 
-Bordereau, technical-account, and cash-call calls also forward the tenant and the
-ASSUMED book to the expert (`X-EIA-Tenant` and `X-EIA-Book: ASSUMED`); a supplied
-`X-EIA-Book` other than ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`. A
-bordereau records `periodStart`, `periodEnd`, `receivedDate`, `currency`,
-`premiumAmount`, `lossAmount`, `commissionAmount`, `otherChargesAmount`,
-`lineCount`, and optional `notes`; it starts `RECEIVED` and its status then
-moves only to `PROCESSED` or `FAILED`. A cash call records `periodStart`,
-`periodEnd`, `amount`, `currency`, `dueDate`, and optional `notes`; the expert
-assigns the call number, the call starts `REQUESTED`, and the status then moves
-only to `ISSUED`, `SETTLED`, or `CANCELLED` (with `REQUESTED` rejected as a
-target).
+Bordereau, technical-account, cash-call, and security calls also forward the
+tenant and the ASSUMED book to the expert (`X-EIA-Tenant` and
+`X-EIA-Book: ASSUMED`); a supplied `X-EIA-Book` other than ASSUMED is hidden as
+404 `BOOK_SCOPE_VIOLATION`. A security record carries `securityType`,
+`requiredAmount`, `heldAmount`, `currency`, `providerPartyId`, `expiryDate`, and
+`approvalRef`; the projection returns the id, those fields, `status`, and
+`createdAt`. A bordereau records `periodStart`, `periodEnd`, `receivedDate`,
+`currency`, `premiumAmount`, `lossAmount`, `commissionAmount`,
+`otherChargesAmount`, `lineCount`, and optional `notes`; it starts `RECEIVED`
+and its status then moves only to `PROCESSED` or `FAILED`. A cash call records
+`periodStart`, `periodEnd`, `amount`, `currency`, `dueDate`, and optional
+`notes`; the expert assigns the call number, the call starts `REQUESTED`, and
+the status then moves only to `ISSUED`, `SETTLED`, or `CANCELLED` (with
+`REQUESTED` rejected as a target).
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,

@@ -319,7 +319,7 @@ class ContractCommandRulesTest {
 
     @Test
     void rejectsSecurityExpiryBeforeEffectiveDate() {
-        ContractCommands.CreateSecurity command = new ContractCommands.CreateSecurity(
+        CreateSecurityCommand command = new CreateSecurityCommand(
                 "LETTER_OF_CREDIT", new BigDecimal("5000000"), new BigDecimal("5000000"), "USD",
                 null, null, LocalDate.of(2026, 6, 1), null, LocalDate.of(2026, 1, 1), null,
                 null, null, null, null, Instant.parse("2026-01-01T00:00:00Z"));
@@ -332,7 +332,7 @@ class ContractCommandRulesTest {
 
     @Test
     void rejectsSecurityWithoutType() {
-        ContractCommands.CreateSecurity command = new ContractCommands.CreateSecurity(
+        CreateSecurityCommand command = new CreateSecurityCommand(
                 null, new BigDecimal("5000000"), null, null, null, null, null, null, null,
                 null, null, null, null, null, null);
 
@@ -340,6 +340,28 @@ class ContractCommandRulesTest {
                 .isInstanceOf(ContractValidationException.class)
                 .extracting(ex -> ((ContractValidationException) ex).code())
                 .isEqualTo("INVALID_SECURITY_TYPE");
+    }
+
+    @Test
+    void acceptsAValidSecurity() {
+        CreateSecurityCommand command = new CreateSecurityCommand(
+                "LETTER_OF_CREDIT", new BigDecimal("5000000"), new BigDecimal("4500000"), "USD",
+                null, null, LocalDate.of(2026, 1, 1), null, LocalDate.of(2027, 3, 31), null,
+                null, null, null, "APR-2026-0007", Instant.parse("2026-01-05T00:00:00Z"));
+
+        assertThatCode(() -> ContractCommandRules.validate(command)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsSecurityWithATooLongApprovalReference() {
+        CreateSecurityCommand command = new CreateSecurityCommand(
+                "LETTER_OF_CREDIT", new BigDecimal("5000000"), null, "USD", null, null, null,
+                null, null, null, null, null, null, "A".repeat(65), null);
+
+        assertThatThrownBy(() -> ContractCommandRules.validate(command))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_APPROVAL_REF");
     }
 
     @Test

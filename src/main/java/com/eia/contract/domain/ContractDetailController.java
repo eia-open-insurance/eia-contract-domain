@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Public contract detail API: layers, participants, terms, security, cessions,
+ * Public contract detail API: layers, participants, terms, cessions,
  * commutations, and bind.
  *
  * <p>Every path follows SPEC 11.3.10 under {@code /api/v1/contracts/{contractId}}.
@@ -93,23 +93,6 @@ public class ContractDetailController {
                                              @RequestBody ContractCommands.CreateTerm command) {
         ContractCommandRules.validate(command);
         return client.createTerm(tenantId, contractId, command);
-    }
-
-    // -------------------------------------------------------------- security
-
-    @GetMapping("/security")
-    public List<ContractResources.Security> security(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                                                     @PathVariable UUID contractId) {
-        return client.findSecurity(tenantId, contractId);
-    }
-
-    @PostMapping("/security")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ContractResources.Security createSecurity(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                                                     @PathVariable UUID contractId,
-                                                     @RequestBody ContractCommands.CreateSecurity command) {
-        ContractCommandRules.validate(command);
-        return client.createSecurity(tenantId, contractId, command);
     }
 
     // --------------------------------------------------------------- cessions
