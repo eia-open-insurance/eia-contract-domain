@@ -82,13 +82,6 @@ class ContractDetailControllerTest {
                 "RECORDED", null, NOW, 0, NOW, NOW);
     }
 
-    private static ContractResources.Bordereau bordereau() {
-        return new ContractResources.Bordereau(UUID.randomUUID(), TENANT, CONTRACT_ID,
-                "BRD-2026-00001", "CLAIMS", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
-                NOW, null, "CSV", "cedent-file-1", "RECEIVED", 10, 9, 1,
-                new BigDecimal("240000.0000"), "USD", null, null, null, NOW, NOW);
-    }
-
     private static ContractResources.Commutation commutation(String status) {
         return new ContractResources.Commutation(COMMUTATION_ID, TENANT, CONTRACT_ID,
                 "COM-2026-00001", "FULL", LocalDate.of(2026, 12, 31), LocalDate.of(2026, 11, 30),
@@ -476,89 +469,6 @@ class ContractDetailControllerTest {
                                 """))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("CESSION_EXCEEDS_CONTRACT_LIMIT"));
-    }
-
-    // -------------------------------------------------------------- bordereaux
-
-    @Test
-    void listsBordereaux() throws Exception {
-        when(client.findBordereaux(TENANT, CONTRACT_ID)).thenReturn(List.of(bordereau()));
-
-        mvc.perform(get("/api/v1/contracts/{id}/bordereaux", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].bordereauNumber").value("BRD-2026-00001"))
-                .andExpect(jsonPath("$[0].lineCount").value(10))
-                .andExpect(jsonPath("$[0].totalAmount").value("240000.0000"));
-    }
-
-    @Test
-    void returnsOneBordereau() throws Exception {
-        when(client.findBordereau(eq(TENANT), eq(CONTRACT_ID), any(UUID.class))).thenReturn(bordereau());
-
-        mvc.perform(get("/api/v1/contracts/{id}/bordereaux/{bordereauId}", CONTRACT_ID,
-                        "99999999-9999-7999-8999-999999999999")
-                        .header("X-EIA-Tenant", TENANT.toString()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.currency").value("USD"));
-    }
-
-    @Test
-    void createsBordereau() throws Exception {
-        when(client.createBordereau(eq(TENANT), eq(CONTRACT_ID),
-                any(ContractCommands.CreateBordereau.class))).thenReturn(bordereau());
-
-        mvc.perform(post("/api/v1/contracts/{id}/bordereaux", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"bordereauType": "CLAIMS", "periodFrom": "2026-01-01",
-                                 "periodTo": "2026-03-31", "sourceFormat": "CSV",
-                                 "lineCount": 10, "validLineCount": 9, "exceptionCount": 1,
-                                 "totalAmount": "240000"}
-                                """))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.status").value("RECEIVED"));
-    }
-
-    @Test
-    void rejectsBordereauWithInvertedPeriod() throws Exception {
-        mvc.perform(post("/api/v1/contracts/{id}/bordereaux", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"bordereauType": "CLAIMS", "periodFrom": "2026-03-31",
-                                 "periodTo": "2026-01-01", "sourceFormat": "CSV", "lineCount": 1}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
-    }
-
-    @Test
-    void rejectsBordereauWithTooManyValidLines() throws Exception {
-        mvc.perform(post("/api/v1/contracts/{id}/bordereaux", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"bordereauType": "CLAIMS", "periodFrom": "2026-01-01",
-                                 "periodTo": "2026-03-31", "sourceFormat": "CSV",
-                                 "lineCount": 5, "validLineCount": 6}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_LINE_COUNT"));
-    }
-
-    @Test
-    void rejectsUnknownBordereauFormat() throws Exception {
-        mvc.perform(post("/api/v1/contracts/{id}/bordereaux", CONTRACT_ID)
-                        .header("X-EIA-Tenant", TENANT.toString())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"bordereauType": "CLAIMS", "periodFrom": "2026-01-01",
-                                 "periodTo": "2026-03-31", "sourceFormat": "PAPYRUS"}
-                                """))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_SOURCE_FORMAT"));
     }
 
     // ------------------------------------------------------------ commutations

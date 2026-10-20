@@ -128,31 +128,6 @@ public final class ContractResources {
             Instant updatedAt
     ) {}
 
-    public record Bordereau(
-            UUID id,
-            UUID tenantId,
-            UUID contractId,
-            String bordereauNumber,
-            String bordereauType,
-            LocalDate periodFrom,
-            LocalDate periodTo,
-            Instant receivedAt,
-            UUID sourceDocumentId,
-            String sourceFormat,
-            String sourceReference,
-            String status,
-            int lineCount,
-            Integer validLineCount,
-            Integer exceptionCount,
-            @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal totalAmount,
-            String currency,
-            String checksum,
-            Instant processedAt,
-            String notes,
-            Instant createdAt,
-            Instant updatedAt
-    ) {}
-
     public record Commutation(
             UUID id,
             UUID tenantId,

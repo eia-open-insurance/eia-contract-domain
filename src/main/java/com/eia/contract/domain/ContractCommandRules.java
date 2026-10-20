@@ -52,11 +52,6 @@ final class ContractCommandRules {
 
     static final Set<String> CESSION_STATUSES = Set.of("RECORDED", "CONFIRMED", "REVERSED", "DISPUTED");
 
-    static final Set<String> BORDEREAU_TYPES = Set.of(
-            "PREMIUM", "CLAIMS", "CESSION", "ACCOUNTING", "LOSS_DEVELOPMENT", "SECURITY", "CASH_LOSS");
-
-    static final Set<String> SOURCE_FORMATS = Set.of("CSV", "XLSX", "XML", "JSON", "MANUAL");
-
     static final Set<String> BORDEREAU_STATUSES = Set.of(
             "RECEIVED", "PARSING", "VALIDATED", "PARTIALLY_POSTED", "POSTED", "REJECTED", "SUPERSEDED");
 
@@ -154,26 +149,35 @@ final class ContractCommandRules {
         dateRange(command.effectiveFrom(), command.effectiveTo());
     }
 
-    static void validate(ContractCommands.CreateBordereau command) {
-        oneOf(BORDEREAU_TYPES, command.bordereauType(), "bordereauType", true);
-        required(command.periodFrom(), "periodFrom");
-        required(command.periodTo(), "periodTo");
-        if (command.periodTo().isBefore(command.periodFrom())) {
-            throw new ContractValidationException("INVALID_DATE_RANGE", "periodTo",
-                    "periodTo must not be before periodFrom");
+    /**
+     * A received bordereau always belongs to the ASSUMED book: the period and
+     * receipt date must be present and ordered, the currency must be an ISO
+     * code, every financial component is required and non-negative, and the
+     * line count is a non-negative integer. The expert owns the currency
+     * reconciliation against the contract, the technical-account linkage, and
+     * the lifecycle transitions.
+     */
+    static void validate(CreateBordereauCommand command) {
+        required(command.periodStart(), "periodStart");
+        required(command.periodEnd(), "periodEnd");
+        if (command.periodStart() != null && command.periodEnd() != null
+                && !command.periodEnd().isAfter(command.periodStart())) {
+            throw new ContractValidationException("INVALID_DATE_RANGE", "periodEnd",
+                    "periodEnd must be after periodStart");
         }
-        oneOf(SOURCE_FORMATS, command.sourceFormat(), "sourceFormat", true);
-        oneOf(BORDEREAU_STATUSES, command.status(), "status", false);
-        int lines = integer(command.lineCount(), "lineCount", 0, 10_000_000, false) == null
-                ? 0 : command.lineCount();
-        Integer valid = integer(command.validLineCount(), "validLineCount", 0, 10_000_000, false);
-        if (valid != null && valid > lines) {
-            throw new ContractValidationException("INVALID_LINE_COUNT", "validLineCount",
-                    "validLineCount cannot exceed lineCount");
-        }
-        integer(command.exceptionCount(), "exceptionCount", 0, 10_000_000, false);
-        money(command.totalAmount(), "totalAmount", false);
-        currency(command.currency(), "currency");
+        required(command.receivedDate(), "receivedDate");
+        requiredCurrency(command.currency(), "currency");
+        money(command.premiumAmount(), "premiumAmount", true);
+        money(command.lossAmount(), "lossAmount", true);
+        money(command.commissionAmount(), "commissionAmount", true);
+        money(command.otherChargesAmount(), "otherChargesAmount", true);
+        integer(command.lineCount(), "lineCount", 0, 10_000_000, true);
+        text(command.notes(), "notes", 400);
+    }
+
+    static void validate(UpdateBordereauStatusCommand command) {
+        oneOf(BORDEREAU_STATUSES, command.status(), "status", true);
+        text(command.notes(), "notes", 400);
     }
 
     static void validate(ContractCommands.CreateCommutation command) {

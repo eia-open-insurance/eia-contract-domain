@@ -16,7 +16,7 @@ import java.util.UUID;
 
 /**
  * Public contract detail API: layers, participants, terms, security, cessions,
- * bordereaux, commutations, and bind.
+ * commutations, and bind.
  *
  * <p>Every path follows SPEC 11.3.10 under {@code /api/v1/contracts/{contractId}}.
  * The tenant comes from {@code X-EIA-Tenant}; the domain validates the command shape
@@ -127,30 +127,6 @@ public class ContractDetailController {
                                                    @RequestBody ContractCommands.CreateCession command) {
         ContractCommandRules.validate(command);
         return client.createCession(tenantId, contractId, command);
-    }
-
-    // -------------------------------------------------------------- bordereaux
-
-    @GetMapping("/bordereaux")
-    public List<ContractResources.Bordereau> bordereaux(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                                                        @PathVariable UUID contractId) {
-        return client.findBordereaux(tenantId, contractId);
-    }
-
-    @GetMapping("/bordereaux/{bordereauId}")
-    public ContractResources.Bordereau bordereau(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                                                 @PathVariable UUID contractId,
-                                                 @PathVariable UUID bordereauId) {
-        return client.findBordereau(tenantId, contractId, bordereauId);
-    }
-
-    @PostMapping("/bordereaux")
-    @ResponseStatus(HttpStatus.CREATED)
-    public ContractResources.Bordereau createBordereau(@RequestHeader("X-EIA-Tenant") UUID tenantId,
-                                                       @PathVariable UUID contractId,
-                                                       @RequestBody ContractCommands.CreateBordereau command) {
-        ContractCommandRules.validate(command);
-        return client.createBordereau(tenantId, contractId, command);
     }
 
     // ------------------------------------------------------------ commutations

@@ -8,12 +8,18 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 
 ### Added
 
-- Public APIs for layers, participants, terms, security, cessions, bordereaux,
-  commutations (propose, approve, execute), technical accounts (list, produce,
-  change status), bind eligibility, and bind under
-  `/api/v1/contracts/{contractId}/...`.
+- Public APIs for layers, participants, terms, security, cessions, bordereaux
+  (list, record, change status), commutations (propose, approve, execute),
+  technical accounts (list, produce, change status), bind eligibility, and bind
+  under `/api/v1/contracts/{contractId}/...`.
 - `GET /api/v1/contracts/search` shell global-search projection with the common
   `query`/`limit`/`items[]` shape, tenant scoping, and the ASSUMED book wall.
+- Bordereau proxy forwards the tenant and the ASSUMED book to the expert on
+  every call and preserves the expert's `400`/`404`/`409` code and message; a
+  supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`. The
+  projection carries the period, receipt date, currency, premium, loss,
+  commission, other charges, line count, notes, lifecycle status, and the
+  linked technical account.
 - Technical-account proxy forwards the tenant and the ASSUMED book to the
   expert on every call and preserves the expert's `400`/`404`/`409` code and
   message; a supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`.
@@ -23,7 +29,7 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   (404, 409, 400, 502).
 - `scripts/live-smoke.ps1`, a 41-check live PostgreSQL smoke covering create,
   layers, participants, bind, cession, capacity rejection, commutation, and close.
-- 90 JUnit tests.
+- 158 JUnit tests.
 
 ### Changed
 

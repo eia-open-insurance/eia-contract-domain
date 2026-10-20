@@ -99,25 +99,6 @@ public final class ContractCommands {
             UUID bordereauId
     ) {}
 
-    public record CreateBordereau(
-            String bordereauNumber,
-            String bordereauType,
-            LocalDate periodFrom,
-            LocalDate periodTo,
-            Instant receivedAt,
-            UUID sourceDocumentId,
-            String sourceFormat,
-            String sourceReference,
-            String status,
-            Integer lineCount,
-            Integer validLineCount,
-            Integer exceptionCount,
-            BigDecimal totalAmount,
-            String currency,
-            String checksum,
-            String notes
-    ) {}
-
     public record CreateCommutation(
             String commutationNumber,
             String commutationType,

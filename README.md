@@ -17,14 +17,17 @@ Contract business rules, transaction catalog, orchestration, approvals, and APIs
 
 The public API exposes the contract header and its children under
 `/api/v1/contracts/{contractId}`: `layers`, `participants`, `terms` (plus
-`terms/requirements`), `security`, `cessions`, `bordereaux`, `commutations`
-(propose, approve, execute), `technical-accounts` (list, produce, change status),
-`bind-eligibility`, and `bind`. All requests carry `X-EIA-Tenant`; money and
-percentages are decimal strings.
+`terms/requirements`), `security`, `cessions`, `bordereaux` (list, record, change
+status), `commutations` (propose, approve, execute), `technical-accounts` (list,
+produce, change status), `bind-eligibility`, and `bind`. All requests carry
+`X-EIA-Tenant`; money and percentages are decimal strings.
 
-Technical-account calls also forward the tenant and the ASSUMED book to the
-expert (`X-EIA-Tenant` and `X-EIA-Book: ASSUMED`); a supplied `X-EIA-Book` other
-than ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`.
+Bordereau and technical-account calls also forward the tenant and the ASSUMED
+book to the expert (`X-EIA-Tenant` and `X-EIA-Book: ASSUMED`); a supplied
+`X-EIA-Book` other than ASSUMED is hidden as 404 `BOOK_SCOPE_VIOLATION`. A
+bordereau records `periodStart`, `periodEnd`, `receivedDate`, `currency`,
+`premiumAmount`, `lossAmount`, `commissionAmount`, `otherChargesAmount`,
+`lineCount`, and optional `notes`.
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,

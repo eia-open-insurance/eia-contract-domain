@@ -32,8 +32,6 @@ public class ContractDetailClient {
             new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ContractResources.Cession>> CESSIONS =
             new ParameterizedTypeReference<>() {};
-    private static final ParameterizedTypeReference<List<ContractResources.Bordereau>> BORDEREAUX =
-            new ParameterizedTypeReference<>() {};
     private static final ParameterizedTypeReference<List<ContractResources.Commutation>> COMMUTATIONS =
             new ParameterizedTypeReference<>() {};
 
@@ -104,21 +102,6 @@ public class ContractDetailClient {
                                                    ContractCommands.CreateCession command) {
         return post("/internal/v1/contracts/{contractId}/cessions", tenantId, command,
                 ContractResources.Cession.class, contractId);
-    }
-
-    public List<ContractResources.Bordereau> findBordereaux(UUID tenantId, UUID contractId) {
-        return getList("/internal/v1/contracts/{contractId}/bordereaux", tenantId, BORDEREAUX, contractId);
-    }
-
-    public ContractResources.Bordereau findBordereau(UUID tenantId, UUID contractId, UUID bordereauId) {
-        return get("/internal/v1/contracts/{contractId}/bordereaux/{bordereauId}", tenantId,
-                ContractResources.Bordereau.class, contractId, bordereauId);
-    }
-
-    public ContractResources.Bordereau createBordereau(UUID tenantId, UUID contractId,
-                                                       ContractCommands.CreateBordereau command) {
-        return post("/internal/v1/contracts/{contractId}/bordereaux", tenantId, command,
-                ContractResources.Bordereau.class, contractId);
     }
 
     public List<ContractResources.Commutation> findCommutations(UUID tenantId, UUID contractId) {

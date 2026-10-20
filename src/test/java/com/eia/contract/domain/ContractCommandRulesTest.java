@@ -147,27 +147,124 @@ class ContractCommandRulesTest {
     }
 
     @Test
-    void rejectsBordereauWithInvertedPeriod() {
-        ContractCommands.CreateBordereau command = new ContractCommands.CreateBordereau(
-                null, "CLAIMS", LocalDate.of(2026, 3, 31), LocalDate.of(2026, 1, 1), null, null,
-                "CSV", null, null, 1, null, null, null, null, null, null);
+    void acceptsAValidBordereau() {
+        assertThatCode(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), "USD",
+                "400000", "240000", "100000", "5000", 10)))
+                .doesNotThrowAnyException();
+    }
 
-        assertThatThrownBy(() -> ContractCommandRules.validate(command))
+    @Test
+    void rejectsBordereauWithoutPeriodStart() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                null, LocalDate.of(2026, 3, 31), LocalDate.of(2026, 4, 2), "USD",
+                "400000", "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_START");
+    }
+
+    @Test
+    void rejectsBordereauWithoutPeriodEnd() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), null, LocalDate.of(2026, 4, 2), "USD",
+                "400000", "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PERIOD_END");
+    }
+
+    @Test
+    void rejectsBordereauWithInvertedPeriod() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 3, 31), LocalDate.of(2026, 1, 1),
+                LocalDate.of(2026, 4, 2), "USD",
+                "400000", "240000", "100000", "5000", 10)))
                 .isInstanceOf(ContractValidationException.class)
                 .extracting(ex -> ((ContractValidationException) ex).code())
                 .isEqualTo("INVALID_DATE_RANGE");
     }
 
     @Test
-    void rejectsBordereauWithTooManyValidLines() {
-        ContractCommands.CreateBordereau command = new ContractCommands.CreateBordereau(
-                null, "CLAIMS", LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), null, null,
-                "CSV", null, null, 5, 6, null, null, null, null, null);
+    void rejectsBordereauWithoutReceivedDate() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), null, "USD",
+                "400000", "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_RECEIVED_DATE");
+    }
 
-        assertThatThrownBy(() -> ContractCommandRules.validate(command))
+    @Test
+    void rejectsBordereauWithoutCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), null,
+                "400000", "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsLowercaseBordereauCurrency() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), "usd",
+                "400000", "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_CURRENCY");
+    }
+
+    @Test
+    void rejectsBordereauWithoutPremium() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), "USD",
+                null, "240000", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_PREMIUM_AMOUNT");
+    }
+
+    @Test
+    void rejectsNegativeBordereauLoss() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), "USD",
+                "400000", "-1", "100000", "5000", 10)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_LOSS_AMOUNT");
+    }
+
+    @Test
+    void rejectsBordereauWithoutLineCount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(bordereau(
+                LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
+                LocalDate.of(2026, 4, 2), "USD",
+                "400000", "240000", "100000", "5000", null)))
                 .isInstanceOf(ContractValidationException.class)
                 .extracting(ex -> ((ContractValidationException) ex).code())
                 .isEqualTo("INVALID_LINE_COUNT");
+    }
+
+    @Test
+    void rejectsAnUnknownBordereauStatus() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateBordereauStatusCommand("PAID", null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void acceptsAValidBordereauStatus() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateBordereauStatusCommand("posted", "Posted to TA-2026-00077")))
+                .doesNotThrowAnyException();
     }
 
     @Test
@@ -348,5 +445,17 @@ class ContractCommandRulesTest {
                 cededLosses == null ? null : new BigDecimal(cededLosses),
                 commission == null ? null : new BigDecimal(commission),
                 otherCharges == null ? null : new BigDecimal(otherCharges));
+    }
+
+    private static CreateBordereauCommand bordereau(
+            LocalDate periodStart, LocalDate periodEnd, LocalDate receivedDate, String currency,
+            String premiumAmount, String lossAmount, String commissionAmount,
+            String otherChargesAmount, Integer lineCount) {
+        return new CreateBordereauCommand(periodStart, periodEnd, receivedDate, currency,
+                premiumAmount == null ? null : new BigDecimal(premiumAmount),
+                lossAmount == null ? null : new BigDecimal(lossAmount),
+                commissionAmount == null ? null : new BigDecimal(commissionAmount),
+                otherChargesAmount == null ? null : new BigDecimal(otherChargesAmount),
+                lineCount, null);
     }
 }

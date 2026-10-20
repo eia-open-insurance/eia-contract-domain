@@ -23,8 +23,9 @@ require it as well.
 | GET | `/terms/requirements` | Required terms for the type and the missing ones |
 | GET/POST | `/security` | Security and collateral |
 | GET/POST | `/cessions` | Cessions |
-| GET/POST | `/bordereaux` | Bordereaux |
+| GET/POST | `/bordereaux` | Bordereaux / record a received bordereau |
 | GET | `/bordereaux/{bordereauId}` | One bordereau |
+| PATCH | `/bordereaux/{bordereauId}/status` | Change the bordereau lifecycle status |
 | GET/POST | `/technical-accounts` | Technical accounts / produce an account |
 | PATCH | `/technical-accounts/{accountId}/status` | Change the account lifecycle status |
 | GET/POST | `/commutations` | Commutations |
@@ -44,9 +45,9 @@ preconditions and approval are enforced.
 - Command shape validation: required fields, enumerations, non-negative money,
   percentages in 0..100, ISO currency format, date ordering, and the ASSUMED book
   wall (`sourceVertical` must be `ASSUMED`). Errors are 400 with a specific code.
-- Technical-account calls forward the tenant and the ASSUMED book on every
-  expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as 404
-  `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
+- Technical-account and bordereau calls forward the tenant and the ASSUMED book
+  on every expert call. A supplied `X-EIA-Book` other than ASSUMED is hidden as
+  404 `BOOK_SCOPE_VIOLATION`; an absent header is accepted for compatibility with
   the other contract proxy routes.
 - Expert error translation: 404 -> `NOT_FOUND`, 409 -> the expert's code (409),
   400 -> the expert's code (400), 5xx/unreachable -> 502 `EXPERT_UNAVAILABLE`.
@@ -57,11 +58,14 @@ preconditions and approval are enforced.
 
 - `ContractControllerTest` (existing behaviour, the bind-command guard, and the
   search projection), `ContractDetailControllerTest` (every new endpoint,
-  success and failure), `TechnicalAccountControllerTest` (technical-account
-  proxy and book wall), `TechnicalAccountClientTest` (tenant and ASSUMED
-  forwarding plus expert 400/404/409 preservation with
-  `MockRestServiceServer`), `ContractCommandRulesTest` (validation rules),
-  `ContractStatusTest` — run with `./gradlew test`.
+  success and failure), `BordereauControllerTest` (bordereau proxy, book wall,
+  and command validation), `BordereauClientTest` (tenant and ASSUMED forwarding
+  plus expert 400/404/409 preservation with `MockRestServiceServer`),
+  `TechnicalAccountControllerTest` (technical-account proxy and book wall),
+  `TechnicalAccountClientTest` (tenant and ASSUMED forwarding plus expert
+  400/404/409 preservation with `MockRestServiceServer`),
+  `ContractCommandRulesTest` (validation rules), `ContractStatusTest` — run with
+  `./gradlew test`.
 
 ## Live smoke
 
