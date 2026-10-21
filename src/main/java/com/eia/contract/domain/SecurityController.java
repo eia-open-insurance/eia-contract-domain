@@ -2,6 +2,7 @@ package com.eia.contract.domain;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +22,8 @@ import java.util.UUID;
  * header is accepted for compatibility with the other contract proxy routes.
  * Every call forwards the tenant and the ASSUMED book to the expert, and the
  * expert's structured {@code 400}/{@code 404}/{@code 409} problems are
- * preserved.</p>
+ * preserved. A security record is created with an initial status by the expert
+ * and can then only be released or expired through the status action.</p>
  */
 @RestController
 @RequestMapping("/api/v1/contracts/{contractId}/security")
@@ -50,6 +52,24 @@ public class SecurityController {
         requireAssumedBookWhenPresent(book);
         ContractCommandRules.validate(command);
         return service.create(tenantId, contractId, command);
+    }
+
+    /**
+     * Releases or expires one security record. The expert owns the stored
+     * transition; an illegal or repeated move is a 409 that the public API
+     * preserves (a released record is terminal, while an expired record can
+     * still be released).
+     */
+    @PatchMapping("/{securityId}/status")
+    public SecurityRecord updateStatus(
+            @RequestHeader("X-EIA-Tenant") UUID tenantId,
+            @RequestHeader(value = "X-EIA-Book", required = false) String book,
+            @PathVariable UUID contractId,
+            @PathVariable UUID securityId,
+            @RequestBody UpdateSecurityStatusCommand command) {
+        requireAssumedBookWhenPresent(book);
+        ContractCommandRules.validate(command);
+        return service.updateStatus(tenantId, contractId, securityId, command);
     }
 
     /**

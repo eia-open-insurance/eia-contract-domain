@@ -27,4 +27,9 @@ public class SecurityService {
     public SecurityRecord create(UUID tenantId, UUID contractId, CreateSecurityCommand command) {
         return client.create(tenantId, contractId, command);
     }
+
+    public SecurityRecord updateStatus(UUID tenantId, UUID contractId, UUID securityId,
+                                       UpdateSecurityStatusCommand command) {
+        return client.updateStatus(tenantId, contractId, securityId, command);
+    }
 }

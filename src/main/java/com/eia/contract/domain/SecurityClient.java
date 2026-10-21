@@ -18,7 +18,7 @@ import java.util.UUID;
  * <p>Every call forwards the tenant and the ASSUMED book context so the expert
  * can enforce tenancy and the book wall independently. The expert is the
  * aggregate guard for the currency reconciliation, the over-collateralisation
- * approval, the effective dates, and the initial lifecycle status; this client
+ * approval, the effective dates, and the lifecycle transitions; this client
  * translates its structured error body into domain exceptions so the public API
  * preserves the expert's {@code 400}/{@code 404}/{@code 409} code and
  * message.</p>
@@ -31,6 +31,13 @@ public class SecurityClient {
     public static final String TENANT_HEADER = "X-EIA-Tenant";
 
     private static final String BASE_PATH = "/internal/v1/contracts/{contractId}/security";
+    /**
+     * The lifecycle action is part of the expert's public security API, which owns
+     * the transition and publishes the status event; the older internal surface
+     * remains the bind and commutation read/create path.
+     */
+    private static final String STATUS_PATH =
+            "/api/v1/contracts/{contractId}/security/{securityId}/status";
     private static final ParameterizedTypeReference<List<SecurityRecord>> SECURITIES =
             new ParameterizedTypeReference<>() {};
 
@@ -63,6 +70,28 @@ public class SecurityClient {
         try {
             SecurityRecord security = client.post()
                     .uri(uri -> uri.path(BASE_PATH).queryParam("tenantId", tenantId).build(contractId))
+                    .header(TENANT_HEADER, tenantId.toString())
+                    .header(BOOK_HEADER, BOOK)
+                    .body(command)
+                    .retrieve()
+                    .body(SecurityRecord.class);
+            if (security == null) {
+                throw new ExpertIntegrationException("Contract expert returned an empty body", null);
+            }
+            return security;
+        } catch (RestClientResponseException ex) {
+            throw translate(ex);
+        } catch (ResourceAccessException ex) {
+            throw unavailable(ex);
+        }
+    }
+
+    public SecurityRecord updateStatus(UUID tenantId, UUID contractId, UUID securityId,
+                                       UpdateSecurityStatusCommand command) {
+        try {
+            SecurityRecord security = client.patch()
+                    .uri(uri -> uri.path(STATUS_PATH).queryParam("tenantId", tenantId)
+                            .build(contractId, securityId))
                     .header(TENANT_HEADER, tenantId.toString())
                     .header(BOOK_HEADER, BOOK)
                     .body(command)

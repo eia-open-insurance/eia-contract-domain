@@ -42,6 +42,9 @@ final class ContractCommandRules {
     static final Set<String> SECURITY_STATUSES = Set.of(
             "REQUIRED", "OUTSTANDING", "PARTIAL", "RELEASED", "EXPIRED", "BREACH");
 
+    /** The terminal outcomes a caller may request; the expert owns the transition. */
+    static final Set<String> SECURITY_LIFECYCLE_STATUSES = Set.of("RELEASED", "EXPIRED");
+
     static final Set<String> COLLATERAL_QUALITIES = Set.of(
             "CASH", "GOVERNMENT_SECURITIES", "BANK_GUARANTEE", "CORPORATE_GUARANTEE", "OTHER");
 
@@ -120,6 +123,16 @@ final class ContractCommandRules {
             throw new ContractValidationException("INVALID_EXPIRY_DATE", "expiryDate",
                     "expiryDate must not be before effectiveFrom");
         }
+    }
+
+    /**
+     * A security record can only be released or expired. The expert checks the
+     * stored row and the transition; the domain rejects any other target before
+     * the expert is called so a malformed request is a 400 rather than a
+     * conflict.
+     */
+    static void validate(UpdateSecurityStatusCommand command) {
+        oneOf(SECURITY_LIFECYCLE_STATUSES, command.status(), "status", true);
     }
 
     static void validate(ContractCommands.CreateCession command) {

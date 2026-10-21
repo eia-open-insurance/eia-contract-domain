@@ -365,6 +365,47 @@ class ContractCommandRulesTest {
     }
 
     @Test
+    void acceptsAReleasedSecurityStatus() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateSecurityStatusCommand("RELEASED")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsAnExpiredSecurityStatusCaseInsensitively() {
+        assertThatCode(() -> ContractCommandRules.validate(
+                new UpdateSecurityStatusCommand("expired")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsAnUnknownSecurityStatus() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateSecurityStatusCommand("CANCELLED")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void rejectsANonTerminalSecurityStatusTarget() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateSecurityStatusCommand("OUTSTANDING")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
+    void rejectsAMissingSecurityStatus() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(
+                new UpdateSecurityStatusCommand(null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_STATUS");
+    }
+
+    @Test
     void rejectsNegativeBindExpectedVersion() {
         ContractCommands.Bind command = new ContractCommands.Bind(UUID.randomUUID(), -1);
 

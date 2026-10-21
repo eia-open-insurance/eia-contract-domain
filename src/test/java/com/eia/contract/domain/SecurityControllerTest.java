@@ -19,6 +19,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -266,6 +267,167 @@ class SecurityControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_SECURITY_TYPE"))
                 .andExpect(jsonPath("$.message").value("Unknown securityType: DEPOSIT"));
+    }
+
+    @Test
+    void updatesSecurityStatusToReleased() throws Exception {
+        UpdateSecurityStatusCommand command = new UpdateSecurityStatusCommand("RELEASED");
+        when(service.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID, command))
+                .thenReturn(security("RELEASED"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(SECURITY_ID.toString()))
+                .andExpect(jsonPath("$.status").value("RELEASED"));
+
+        verify(service).updateStatus(TENANT, CONTRACT_ID, SECURITY_ID, command);
+    }
+
+    @Test
+    void updatesSecurityStatusToExpired() throws Exception {
+        UpdateSecurityStatusCommand command = new UpdateSecurityStatusCommand("EXPIRED");
+        when(service.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID, command))
+                .thenReturn(security("EXPIRED"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"EXPIRED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("EXPIRED"));
+
+        verify(service).updateStatus(TENANT, CONTRACT_ID, SECURITY_ID, command);
+    }
+
+    @Test
+    void acceptsAnAbsentBookForAStatusUpdate() throws Exception {
+        UpdateSecurityStatusCommand command = new UpdateSecurityStatusCommand("RELEASED");
+        when(service.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID, command))
+                .thenReturn(security("RELEASED"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void hidesTheStatusEndpointFromAnotherBook() throws Exception {
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "DIRECT")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("BOOK_SCOPE_VIOLATION"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void requiresTheTenantHeaderForAStatusUpdate() throws Exception {
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("MISSING_TENANT"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsAnUnknownSecurityStatusBeforeCallingTheExpert() throws Exception {
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"CANCELLED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
+                .andExpect(jsonPath("$.message").value("Unknown status: CANCELLED"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsANonTerminalSecurityStatusBeforeCallingTheExpert() throws Exception {
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"OUTSTANDING\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void requiresAStatusInTheStatusUpdateBody() throws Exception {
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
+                .andExpect(jsonPath("$.message").value("status is required"));
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void preservesTheExpertConflictOnAStatusUpdate() throws Exception {
+        when(service.updateStatus(eq(TENANT), eq(CONTRACT_ID), eq(SECURITY_ID),
+                any(UpdateSecurityStatusCommand.class)))
+                .thenThrow(new ContractConflictException("INVALID_STATUS_TRANSITION",
+                        "Security status cannot move from RELEASED to EXPIRED"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"EXPIRED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS_TRANSITION"))
+                .andExpect(jsonPath("$.message").value(
+                        "Security status cannot move from RELEASED to EXPIRED"));
+    }
+
+    @Test
+    void preservesTheExpertNotFoundOnAStatusUpdate() throws Exception {
+        when(service.updateStatus(eq(TENANT), eq(CONTRACT_ID), eq(SECURITY_ID),
+                any(UpdateSecurityStatusCommand.class)))
+                .thenThrow(new ResourceNotFoundException(
+                        "Security cccccccc-cccc-7ccc-8ccc-cccccccccccc was not found"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value(
+                        "Security cccccccc-cccc-7ccc-8ccc-cccccccccccc was not found"));
+    }
+
+    @Test
+    void preservesTheExpertValidationOnAStatusUpdate() throws Exception {
+        when(service.updateStatus(eq(TENANT), eq(CONTRACT_ID), eq(SECURITY_ID),
+                any(UpdateSecurityStatusCommand.class)))
+                .thenThrow(new ContractValidationException("INVALID_STATUS", "status",
+                        "Unknown status: CANCELLED"));
+
+        mvc.perform(patch(SECURITY + "/{securityId}/status", CONTRACT_ID, SECURITY_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"RELEASED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_STATUS"))
+                .andExpect(jsonPath("$.message").value("Unknown status: CANCELLED"));
     }
 
     private static SecurityRecord security(String status) {

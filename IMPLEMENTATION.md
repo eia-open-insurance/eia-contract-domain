@@ -22,6 +22,7 @@ require it as well.
 | GET/POST | `/terms` | Contract terms |
 | GET | `/terms/requirements` | Required terms for the type and the missing ones |
 | GET/POST | `/security` | Security and collateral |
+| PATCH | `/security/{securityId}/status` | Release or expire a security (`RELEASED`, `EXPIRED`) |
 | GET/POST | `/cessions` | Cessions |
 | GET/POST | `/bordereaux` | Bordereaux / record a received bordereau |
 | PATCH | `/bordereaux/{bordereauId}/status` | Process or fail a bordereau (`PROCESSED`, `FAILED`) |
@@ -66,7 +67,10 @@ preconditions and approval are enforced.
   an enumeration, the amounts are non-negative, the currency is an ISO code, and
   the approval reference is at most 64 characters. Currency reconciliation, the
   over-collateralisation approval, the effective dates, and the initial status
-  stay in the expert and surface as 409.
+  stay in the expert and surface as 409. The status action accepts only
+  `RELEASED` or `EXPIRED`; it uses the expert's public
+  `/api/v1/contracts/{contractId}/security/{securityId}/status` action, which
+  owns the stored transition and returns 409 for an illegal or repeated move.
 - The period-bordereau client uses the expert's public
   `/api/v1/contracts/{contractId}/bordereaux` API, where the legacy internal
   prefix remains reserved for the ingest-header slice. A bordereau is created
@@ -89,9 +93,10 @@ preconditions and approval are enforced.
   `CashCallControllerTest` (cash-call proxy and book wall),
   `CashCallClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
   preservation with `MockRestServiceServer`),
-  `SecurityControllerTest` (security proxy, book wall, and command validation),
-  `SecurityClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
-  preservation with `MockRestServiceServer`),
+  `SecurityControllerTest` (security proxy, book wall, status action, and command
+  validation), `SecurityClientTest` (tenant and ASSUMED forwarding plus expert
+  400/404/409 preservation with `MockRestServiceServer`, including the status
+  action),
   `ContractCommandRulesTest` (validation rules), `ContractStatusTest` — run with
   `./gradlew test`.
 

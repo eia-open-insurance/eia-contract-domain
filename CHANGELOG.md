@@ -32,19 +32,22 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   contract, period, amount, currency, due date, status, notes, and creation
   time. A call starts `REQUESTED` and the domain accepts only `ISSUED`,
   `SETTLED`, or `CANCELLED` as a status target.
-- Security API: `GET/POST /api/v1/contracts/{contractId}/security`. The proxy
+- Security API: `GET/POST /api/v1/contracts/{contractId}/security` and
+  `PATCH /api/v1/contracts/{contractId}/security/{securityId}/status`. The proxy
   forwards the tenant and the ASSUMED book on every call and preserves the
   expert's `400`/`404`/`409` code and message; a supplied non-ASSUMED book is
   hidden as `404 BOOK_SCOPE_VIOLATION`. The `SecurityRecord` projection carries
   the id, security type, required and held amounts, currency, provider party,
-  expiry date, approval reference, status, and creation time.
+  expiry date, approval reference, status, and creation time. The status action
+  accepts only `RELEASED` or `EXPIRED`; it forwards to the expert's public
+  security lifecycle endpoint, which owns the stored transition.
 - Domain command validation for every new resource, including the ASSUMED book
   wall, enumerations, money, percentages, currency, and date rules.
 - Expert error translation that preserves the structured `code` and status
   (404, 409, 400, 502).
 - `scripts/live-smoke.ps1`, a 41-check live PostgreSQL smoke covering create,
   layers, participants, bind, cession, capacity rejection, commutation, and close.
-- 218 JUnit tests.
+- 239 JUnit tests.
 
 ### Changed
 

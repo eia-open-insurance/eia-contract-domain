@@ -35,6 +35,8 @@ class SecurityClientTest {
     private static final String BASE = "http://expert.test";
     private static final String SECURITY =
             BASE + "/internal/v1/contracts/" + CONTRACT_ID + "/security";
+    private static final String STATUS =
+            BASE + "/api/v1/contracts/" + CONTRACT_ID + "/security/" + SECURITY_ID + "/status";
 
     @Test
     void listsSecurityForwardingTenantAndAssumedBook() {
@@ -169,6 +171,122 @@ class SecurityClientTest {
                     assertThat(conflict.code()).isEqualTo("COLLATERAL_EXCEEDS_OBLIGATION");
                     assertThat(conflict.getMessage()).contains("exceeds the secured obligation");
                 });
+        server.verify();
+    }
+
+    @Test
+    void updatesStatusForwardingTenantAndAssumedBook() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SecurityClient client = new SecurityClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header(SecurityClient.TENANT_HEADER, TENANT.toString()))
+                .andExpect(header(SecurityClient.BOOK_HEADER, "ASSUMED"))
+                .andExpect(content().json("""
+                        {"status": "RELEASED"}
+                        """))
+                .andRespond(withSuccess(
+                        securityJson().replace("\"OUTSTANDING\"", "\"RELEASED\""),
+                        MediaType.APPLICATION_JSON));
+
+        SecurityRecord security = client.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID,
+                new UpdateSecurityStatusCommand("RELEASED"));
+
+        assertThat(security.id()).isEqualTo(SECURITY_ID);
+        assertThat(security.status()).isEqualTo("RELEASED");
+        server.verify();
+    }
+
+    @Test
+    void preservesTheExpertValidationProblemOnAStatusUpdate() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SecurityClient client = new SecurityClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"code": "INVALID_STATUS",
+                                 "message": "Unknown status: CANCELLED"}
+                                """));
+
+        assertThatThrownBy(() -> client.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID,
+                new UpdateSecurityStatusCommand("CANCELLED")))
+                .isInstanceOf(ContractValidationException.class)
+                .satisfies(ex -> {
+                    ContractValidationException validation = (ContractValidationException) ex;
+                    assertThat(validation.code()).isEqualTo("INVALID_STATUS");
+                    assertThat(validation.getMessage()).contains("CANCELLED");
+                });
+        server.verify();
+    }
+
+    @Test
+    void preservesTheExpertNotFoundProblemOnAStatusUpdate() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SecurityClient client = new SecurityClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"code": "NOT_FOUND",
+                                 "message": "Security cccccccc was not found"}
+                                """));
+
+        assertThatThrownBy(() -> client.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID,
+                new UpdateSecurityStatusCommand("RELEASED")))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("cccccccc");
+        server.verify();
+    }
+
+    @Test
+    void preservesTheExpertConflictProblemOnAStatusUpdate() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SecurityClient client = new SecurityClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.CONFLICT)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                                {"code": "INVALID_STATUS_TRANSITION",
+                                 "message": "Security status cannot move from RELEASED to EXPIRED"}
+                                """));
+
+        assertThatThrownBy(() -> client.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID,
+                new UpdateSecurityStatusCommand("EXPIRED")))
+                .isInstanceOf(ContractConflictException.class)
+                .satisfies(ex -> {
+                    ContractConflictException conflict = (ContractConflictException) ex;
+                    assertThat(conflict.code()).isEqualTo("INVALID_STATUS_TRANSITION");
+                    assertThat(conflict.getMessage()).contains("RELEASED to EXPIRED");
+                });
+        server.verify();
+    }
+
+    @Test
+    void mapsAnExpertOutageDuringAStatusUpdateToAnIntegrationFailure() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        SecurityClient client = new SecurityClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThatThrownBy(() -> client.updateStatus(TENANT, CONTRACT_ID, SECURITY_ID,
+                new UpdateSecurityStatusCommand("RELEASED")))
+                .isInstanceOf(ExpertIntegrationException.class)
+                .hasMessageContaining("status 503");
         server.verify();
     }
 
