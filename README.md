@@ -19,9 +19,9 @@ The public API exposes the contract header and its children under
 `/api/v1/contracts/{contractId}`: `layers`, `participants`, `terms` (plus
 `terms/requirements`), `security` (list, record, release/expire), `cessions`,
 `bordereaux` (list, record, change status), `commutations` (propose, approve,
-execute), `technical-accounts` (list, produce, change status), `cash-calls`
-(list, request, change status), `bind-eligibility`, and `bind`. All requests
-carry `X-EIA-Tenant`; money and percentages are decimal strings.
+execute), `technical-accounts` (list, produce, change status, and its lines),
+`cash-calls` (list, request, change status), `bind-eligibility`, and `bind`.
+All requests carry `X-EIA-Tenant`; money and percentages are decimal strings.
 
 Bordereau, technical-account, cash-call, and security calls also forward the
 tenant and the ASSUMED book to the expert (`X-EIA-Tenant` and
@@ -38,6 +38,12 @@ optional `notes`; it starts `RECEIVED` and its status then moves only to
 `amount`, `currency`, `dueDate`, and optional `notes`; the expert assigns the
 call number, the call starts `REQUESTED`, and the status then moves only to
 `ISSUED`, `SETTLED`, or `CANCELLED` (with `REQUESTED` rejected as a target).
+A technical-account line records one header component (`lineType`: `PREMIUM`,
+`LOSS`, `COMMISSION`, or `OTHER`), optional `reference` and `description`, and
+a positive `amount`; `GET .../lines` returns the lines plus `totals` for
+premium, loss, commission, and other, and `DELETE .../lines/{lineId}` removes a
+line. The expert owns the DRAFT-only line write guard, the line ordering, and
+the reconciliation against the account.
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,

@@ -27,6 +27,8 @@ require it as well.
 | GET/POST | `/bordereaux` | Bordereaux / record a received bordereau |
 | PATCH | `/bordereaux/{bordereauId}/status` | Process or fail a bordereau (`PROCESSED`, `FAILED`) |
 | GET/POST | `/technical-accounts` | Technical accounts / produce an account |
+| GET/POST | `/technical-accounts/{accountId}/lines` | Line summary / record a line |
+| DELETE | `/technical-accounts/{accountId}/lines/{lineId}` | Delete a line |
 | PATCH | `/technical-accounts/{accountId}/status` | Change the account lifecycle status |
 | GET/POST | `/cash-calls` | Cash calls / request an interim cash call |
 | PATCH | `/cash-calls/{cashCallId}/status` | Issue, settle, or cancel a cash call |
@@ -59,6 +61,17 @@ preconditions and approval are enforced.
   only `ISSUED`, `SETTLED`, or `CANCELLED` as a status target. The client uses
   the expert's `/internal/v1/contracts/{contractId}/cash-calls` API, which maps
   to the same controller as the public cash-call path.
+- Technical-account line calls use the same book wall and forward the tenant and
+  ASSUMED book to the expert's
+  `/internal/v1/contracts/{contractId}/technical-accounts/{accountId}/lines`
+  API. A line records one header component `lineType` (`PREMIUM`, `LOSS`,
+  `COMMISSION`, or `OTHER`), optional `reference` (64 characters) and
+  `description` (300 characters), and a strictly positive `amount`.
+  `GET .../lines` returns the `TechnicalAccountLine` rows plus
+  `totals` grouped into premium, loss, commission, and other; the domain derives
+  any total the expert omits. `DELETE .../lines/{lineId}` returns 204. The
+  DRAFT-only write guard, the line ordering, and the reconciliation against the
+  account stay in the expert and surface as 409.
 - Security calls use the same book wall and forward the tenant and ASSUMED book
   to the expert's `/internal/v1/contracts/{contractId}/security` API. A security
   record carries `securityType`, `requiredAmount`, `heldAmount`, `currency`,
@@ -90,6 +103,10 @@ preconditions and approval are enforced.
   `TechnicalAccountControllerTest` (technical-account proxy and book wall),
   `TechnicalAccountClientTest` (tenant and ASSUMED forwarding plus expert
   400/404/409 preservation with `MockRestServiceServer`),
+  `TechnicalAccountLineControllerTest` (line summary, create, delete, book wall,
+  and line validation), `TechnicalAccountLineClientTest` (tenant and ASSUMED
+  forwarding, totals normalization, and expert 400/404/409 preservation with
+  `MockRestServiceServer`),
   `CashCallControllerTest` (cash-call proxy and book wall),
   `CashCallClientTest` (tenant and ASSUMED forwarding plus expert 400/404/409
   preservation with `MockRestServiceServer`),

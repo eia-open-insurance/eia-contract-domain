@@ -66,6 +66,9 @@ final class ContractCommandRules {
     static final Set<String> TECHNICAL_ACCOUNT_STATUSES = Set.of(
             "DRAFT", "ISSUED", "AGREED", "SETTLED", "DISPUTED", "SUPERSEDED");
 
+    static final Set<String> TECHNICAL_ACCOUNT_LINE_TYPES =
+            Set.of("PREMIUM", "LOSS", "COMMISSION", "OTHER");
+
     static final Set<String> CASH_CALL_STATUSES = Set.of("ISSUED", "SETTLED", "CANCELLED");
 
     private ContractCommandRules() {
@@ -244,6 +247,23 @@ final class ContractCommandRules {
 
     static void validate(UpdateTechnicalAccountStatusCommand command) {
         oneOf(TECHNICAL_ACCOUNT_STATUSES, command.status(), "status", true);
+    }
+
+    /**
+     * A technical-account line names one header component and a positive
+     * amount; the optional source reference and description are bounded by the
+     * column widths. The account status guard, line ordering, and the
+     * reconciliation against the account totals stay in the expert.
+     */
+    static void validate(CreateTechnicalAccountLineCommand command) {
+        oneOf(TECHNICAL_ACCOUNT_LINE_TYPES, command.lineType(), "lineType", true);
+        BigDecimal amount = money(command.amount(), "amount", true);
+        if (amount.signum() == 0) {
+            throw new ContractValidationException("INVALID_AMOUNT", "amount",
+                    "amount must be greater than zero");
+        }
+        text(command.reference(), "reference", 64);
+        text(command.description(), "description", 300);
     }
 
     /**

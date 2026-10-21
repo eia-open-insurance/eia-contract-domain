@@ -659,6 +659,98 @@ class ContractCommandRulesTest {
                 .doesNotThrowAnyException();
     }
 
+    @Test
+    void acceptsAValidTechnicalAccountLine() {
+        assertThatCode(() -> ContractCommandRules.validate(line(
+                "PREMIUM", "BOR-2026-0001", "Ceded premium Q1", "1000000")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void acceptsATechnicalAccountLineTypeCaseInsensitively() {
+        assertThatCode(() -> ContractCommandRules.validate(line(
+                "loss", null, null, "1")))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void rejectsADetailLineTypeInTheReducedSlice() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PAID_LOSS", null, null, "1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_LINE_TYPE");
+    }
+
+    @Test
+    void rejectsTechnicalAccountLineWithoutType() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                null, null, null, "100")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_LINE_TYPE");
+    }
+
+    @Test
+    void rejectsUnknownTechnicalAccountLineType() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "FEE", null, null, "100")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_LINE_TYPE");
+    }
+
+    @Test
+    void rejectsTechnicalAccountLineWithoutAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PREMIUM", null, null, null)))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsZeroTechnicalAccountLineAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PREMIUM", null, null, "0")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsNegativeTechnicalAccountLineAmount() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PREMIUM", null, null, "-1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_AMOUNT");
+    }
+
+    @Test
+    void rejectsOverlongTechnicalAccountLineReference() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PREMIUM", "R".repeat(65), null, "1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_REFERENCE");
+    }
+
+    @Test
+    void rejectsOverlongTechnicalAccountLineDescription() {
+        assertThatThrownBy(() -> ContractCommandRules.validate(line(
+                "PREMIUM", null, "D".repeat(301), "1")))
+                .isInstanceOf(ContractValidationException.class)
+                .extracting(ex -> ((ContractValidationException) ex).code())
+                .isEqualTo("INVALID_DESCRIPTION");
+    }
+
+    private static CreateTechnicalAccountLineCommand line(
+            String lineType, String reference, String description, String amount) {
+        return new CreateTechnicalAccountLineCommand(lineType, reference, description,
+                amount == null ? null : new BigDecimal(amount));
+    }
+
     private static CreateCashCallCommand cashCall(
             LocalDate periodStart, LocalDate periodEnd, String amount, String currency,
             LocalDate dueDate) {
