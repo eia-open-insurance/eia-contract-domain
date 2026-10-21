@@ -171,9 +171,16 @@ class TechnicalAccountLineClientTest {
 
         assertThat(summary.items()).hasSize(10);
         assertThat(summary.totals().premium()).isEqualByComparingTo("100.0000");
-        assertThat(summary.totals().loss()).isEqualByComparingTo("60.0000");
-        assertThat(summary.totals().commission()).isEqualByComparingTo("3.0000");
-        assertThat(summary.totals().other()).isEqualByComparingTo("10.5000");
+        assertThat(summary.totals().loss()).isEqualByComparingTo("65.0000");
+        assertThat(summary.totals().commission()).isEqualByComparingTo("5.0000");
+        assertThat(summary.totals().other()).isEqualByComparingTo("3.5000");
+        assertThat(summary.totals().details())
+                .containsOnlyKeys("PREMIUM", "REINSTATEMENT", "PAID_LOSS",
+                        "OUTSTANDING_LOSS", "IBNR", "ALAE", "COMMISSION", "BROKERAGE",
+                        "TAX", "ADJUSTMENT");
+        assertThat(summary.totals().details().get("PAID_LOSS")).isEqualByComparingTo("40.0000");
+        assertThat(summary.totals().details().get("IBNR")).isEqualByComparingTo("7.0000");
+        assertThat(summary.totals().details().get("ALAE")).isEqualByComparingTo("3.0000");
         server.verify();
     }
 
@@ -197,9 +204,107 @@ class TechnicalAccountLineClientTest {
 
         assertThat(summary.items()).isEmpty();
         assertThat(summary.totals().premium()).isEqualByComparingTo("100.0000");
-        assertThat(summary.totals().loss()).isEqualByComparingTo("47.0000");
-        assertThat(summary.totals().commission()).isEqualByComparingTo("3.0000");
-        assertThat(summary.totals().other()).isEqualByComparingTo("8.0000");
+        assertThat(summary.totals().loss()).isEqualByComparingTo("52.0000");
+        assertThat(summary.totals().commission()).isEqualByComparingTo("5.0000");
+        assertThat(summary.totals().other()).isEqualByComparingTo("1.0000");
+        server.verify();
+    }
+
+    @Test
+    void mapsEveryDetailLineTypeIntoItsBucketAndKeepsTheDetailMap() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TechnicalAccountLineClient client = new TechnicalAccountLineClient(
+                builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(LINES + "?tenantId=" + TENANT))
+                .andRespond(withSuccess("""
+                        {"accountId": "%s", "lines": [],
+                         "totals": {"PREMIUM": "100.0000", "COMMISSION": "3.0000",
+                                    "BROKERAGE": "2.0000", "PAID_LOSS": "40.0000",
+                                    "OUTSTANDING_LOSS": "10.0000", "IBNR": "7.0000",
+                                    "ALAE": "3.0000", "REINSTATEMENT": "5.0000",
+                                    "CASH_CALL": "1.0000", "FUNDS_WITHHELD": "1.5000",
+                                    "TAX": "1.0000", "ADJUSTMENT": "2.5000",
+                                    "OTHER": "0.5000"},
+                         "bucketTotals": {"premium": "100.0000", "loss": "66.0000",
+                                         "commission": "5.0000", "other": "5.5000"}}
+                        """.formatted(ACCOUNT_ID), MediaType.APPLICATION_JSON));
+
+        LineSummary summary = client.findAll(TENANT, CONTRACT_ID, ACCOUNT_ID);
+        LineSummary.Totals totals = summary.totals();
+
+        assertThat(totals.premium()).isEqualByComparingTo("100.0000");
+        assertThat(totals.loss()).isEqualByComparingTo("66.0000");
+        assertThat(totals.commission()).isEqualByComparingTo("5.0000");
+        assertThat(totals.other()).isEqualByComparingTo("5.5000");
+        assertThat(totals.details()).containsOnlyKeys(
+                "PREMIUM", "COMMISSION", "BROKERAGE", "PAID_LOSS", "OUTSTANDING_LOSS",
+                "IBNR", "ALAE", "REINSTATEMENT", "CASH_CALL", "FUNDS_WITHHELD", "TAX",
+                "ADJUSTMENT", "OTHER");
+        assertThat(totals.details().get("PREMIUM")).isEqualByComparingTo("100.0000");
+        assertThat(totals.details().get("PAID_LOSS")).isEqualByComparingTo("40.0000");
+        assertThat(totals.details().get("OUTSTANDING_LOSS")).isEqualByComparingTo("10.0000");
+        assertThat(totals.details().get("IBNR")).isEqualByComparingTo("7.0000");
+        assertThat(totals.details().get("ALAE")).isEqualByComparingTo("3.0000");
+        assertThat(totals.details().get("COMMISSION")).isEqualByComparingTo("3.0000");
+        assertThat(totals.details().get("BROKERAGE")).isEqualByComparingTo("2.0000");
+        assertThat(totals.details().get("REINSTATEMENT")).isEqualByComparingTo("5.0000");
+        assertThat(totals.details().get("CASH_CALL")).isEqualByComparingTo("1.0000");
+        assertThat(totals.details().get("FUNDS_WITHHELD")).isEqualByComparingTo("1.5000");
+        assertThat(totals.details().get("TAX")).isEqualByComparingTo("1.0000");
+        assertThat(totals.details().get("ADJUSTMENT")).isEqualByComparingTo("2.5000");
+        assertThat(totals.details().get("OTHER")).isEqualByComparingTo("0.5000");
+        server.verify();
+    }
+
+    @Test
+    void prefersTheExpertBucketTotalsOverTheLocalRollup() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TechnicalAccountLineClient client = new TechnicalAccountLineClient(
+                builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(LINES + "?tenantId=" + TENANT))
+                .andRespond(withSuccess("""
+                        {"accountId": "%s", "lines": [],
+                         "totals": {"PREMIUM": "100.0000", "PAID_LOSS": "40.0000",
+                                    "COMMISSION": "3.0000", "TAX": "1.0000"},
+                         "bucketTotals": {"premium": "100.0000", "loss": "50.0000",
+                                         "commission": "5.0000", "other": "2.0000"}}
+                        """.formatted(ACCOUNT_ID), MediaType.APPLICATION_JSON));
+
+        LineSummary summary = client.findAll(TENANT, CONTRACT_ID, ACCOUNT_ID);
+
+        assertThat(summary.totals().premium()).isEqualByComparingTo("100.0000");
+        assertThat(summary.totals().loss()).isEqualByComparingTo("50.0000");
+        assertThat(summary.totals().commission()).isEqualByComparingTo("5.0000");
+        assertThat(summary.totals().other()).isEqualByComparingTo("2.0000");
+        assertThat(summary.totals().details())
+                .containsEntry("PAID_LOSS", new BigDecimal("40.0000"))
+                .containsEntry("TAX", new BigDecimal("1.0000"));
+        server.verify();
+    }
+
+    @Test
+    void mapsTheLegacyLossTypeIntoTheLossBucket() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TechnicalAccountLineClient client = new TechnicalAccountLineClient(
+                builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(LINES + "?tenantId=" + TENANT))
+                .andRespond(withSuccess("""
+                        {"accountId": "%s", "lines": [],
+                         "totals": {"LOSS": "12.0000", "PAID_LOSS": "4.0000"}}
+                        """.formatted(ACCOUNT_ID), MediaType.APPLICATION_JSON));
+
+        LineSummary summary = client.findAll(TENANT, CONTRACT_ID, ACCOUNT_ID);
+
+        assertThat(summary.totals().loss()).isEqualByComparingTo("16.0000");
+        assertThat(summary.totals().details())
+                .containsEntry("LOSS", new BigDecimal("12.0000"))
+                .containsEntry("PAID_LOSS", new BigDecimal("4.0000"));
         server.verify();
     }
 
@@ -223,6 +328,9 @@ class TechnicalAccountLineClientTest {
         assertThat(summary.totals().loss()).isEqualByComparingTo("40.0000");
         assertThat(summary.totals().commission()).isEqualByComparingTo("0");
         assertThat(summary.totals().other()).isEqualByComparingTo("0");
+        assertThat(summary.totals().details())
+                .containsEntry("PREMIUM", new BigDecimal("100.0000"))
+                .containsEntry("PAID_LOSS", new BigDecimal("40.0000"));
         server.verify();
     }
 
@@ -243,6 +351,7 @@ class TechnicalAccountLineClientTest {
         assertThat(summary.totals().loss()).isEqualByComparingTo("0");
         assertThat(summary.totals().commission()).isEqualByComparingTo("0");
         assertThat(summary.totals().other()).isEqualByComparingTo("0");
+        assertThat(summary.totals().details()).isEmpty();
         server.verify();
     }
 

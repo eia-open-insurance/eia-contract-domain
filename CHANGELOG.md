@@ -29,10 +29,13 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   and `DELETE .../lines/{lineId}`. The proxy forwards the tenant and the ASSUMED
   book on every call and preserves the expert's `400`/`404`/`409` code and
   message. `GET` returns the `TechnicalAccountLine` rows plus `totals` grouped
-  into premium, loss, commission, and other; the domain derives any missing
-  total. `POST` records one line (`lineType` is `PREMIUM`, `LOSS`,
-  `COMMISSION`, or `OTHER`, plus optional `reference` and `description`) with a
-  strictly positive `amount`, and `DELETE` returns 204.
+  into premium, loss, commission, and other, with an optional detailed per-type
+  map; the domain derives any missing total. `POST` records one line (`lineType`
+  is `PREMIUM`, `COMMISSION`, `BROKERAGE`, `PAID_LOSS`, `OUTSTANDING_LOSS`,
+  `IBNR`, `ALAE`, `REINSTATEMENT`, `CASH_CALL`, `FUNDS_WITHHELD`, `TAX`,
+  `ADJUSTMENT`, or `OTHER`; the retired `LOSS` type is rejected, plus optional
+  `reference` and `description`) with a strictly positive `amount`, and
+  `DELETE` returns 204.
 - Cash-call API: `GET/POST /api/v1/contracts/{contractId}/cash-calls` and
   `PATCH /api/v1/contracts/{contractId}/cash-calls/{cashCallId}/status`. The
   proxy forwards the tenant and the ASSUMED book on every call and preserves the
@@ -56,10 +59,19 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   (404, 409, 400, 502).
 - `scripts/live-smoke.ps1`, a 41-check live PostgreSQL smoke covering create,
   layers, participants, bind, cession, capacity rejection, commutation, and close.
-- 281 JUnit tests.
+- 293 JUnit tests.
 
 ### Changed
 
+- Technical-account lines accept the SPEC 11.3.4 detail vocabulary
+  (`PREMIUM`, `COMMISSION`, `BROKERAGE`, `PAID_LOSS`, `OUTSTANDING_LOSS`,
+  `IBNR`, `ALAE`, `REINSTATEMENT`, `CASH_CALL`, `FUNDS_WITHHELD`, `TAX`,
+  `ADJUSTMENT`, and `OTHER`). The retired `LOSS` aggregate is rejected on create
+  and the expert migrates stored rows to `PAID_LOSS`; a legacy `LOSS` total is
+  still read into the loss bucket. The line summary keeps the four statement
+  buckets and adds the optional detailed per-type totals map. `BROKERAGE` rolls
+  into commission; `REINSTATEMENT` and `CASH_CALL` roll into loss; funds
+  withheld, tax, adjustment, and other roll into other.
 - `PATCH /api/v1/contracts/{id}/status` rejects `BOUND` with
   `409 BIND_REQUIRES_COMMAND`; bind goes through `POST .../bind`.
 

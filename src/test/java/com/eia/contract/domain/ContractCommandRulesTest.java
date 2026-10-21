@@ -5,8 +5,10 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -667,16 +669,34 @@ class ContractCommandRulesTest {
     }
 
     @Test
+    void acceptsEveryTechnicalAccountLineType() {
+        assertThat(ContractCommandRules.TECHNICAL_ACCOUNT_LINE_TYPES)
+                .containsExactlyInAnyOrder(
+                        "PREMIUM", "COMMISSION", "BROKERAGE", "PAID_LOSS",
+                        "OUTSTANDING_LOSS", "IBNR", "ALAE", "REINSTATEMENT", "CASH_CALL",
+                        "FUNDS_WITHHELD", "TAX", "ADJUSTMENT", "OTHER");
+        for (String lineType : List.of(
+                "PREMIUM", "COMMISSION", "BROKERAGE", "PAID_LOSS", "OUTSTANDING_LOSS",
+                "IBNR", "ALAE", "REINSTATEMENT", "CASH_CALL", "FUNDS_WITHHELD", "TAX",
+                "ADJUSTMENT", "OTHER")) {
+            assertThatCode(() -> ContractCommandRules.validate(line(
+                    lineType, null, null, "1")))
+                    .as("line type %s", lineType)
+                    .doesNotThrowAnyException();
+        }
+    }
+
+    @Test
     void acceptsATechnicalAccountLineTypeCaseInsensitively() {
         assertThatCode(() -> ContractCommandRules.validate(line(
-                "loss", null, null, "1")))
+                "paid_loss", null, null, "1")))
                 .doesNotThrowAnyException();
     }
 
     @Test
-    void rejectsADetailLineTypeInTheReducedSlice() {
+    void rejectsTheRetiredLossLineType() {
         assertThatThrownBy(() -> ContractCommandRules.validate(line(
-                "PAID_LOSS", null, null, "1")))
+                "LOSS", null, null, "1")))
                 .isInstanceOf(ContractValidationException.class)
                 .extracting(ex -> ((ContractValidationException) ex).code())
                 .isEqualTo("INVALID_LINE_TYPE");

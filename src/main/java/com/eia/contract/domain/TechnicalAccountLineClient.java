@@ -10,11 +10,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -26,9 +25,11 @@ import java.util.UUID;
  * reconciliation against the account totals; this client translates its
  * structured error body into domain exceptions so the public API preserves the
  * expert's {@code 400}/{@code 404}/{@code 409} code and message. The expert
- * serves the lines as a {@code lines} array and a per-type {@code totals} map;
- * the client maps that read model to the public summary ({@code items} plus the
- * four financial buckets) and fills in any bucket the expert omits.</p>
+ * serves the lines as a {@code lines} array, a per-line-type {@code totals} map,
+ * and the authoritative four-bucket {@code bucketTotals} map; the client rolls
+ * that read model into the public summary ({@code items} plus the four financial
+ * buckets and the detailed per-type map) and fills in any bucket the expert
+ * omits.</p>
  */
 @Component
 public class TechnicalAccountLineClient {
@@ -40,11 +41,6 @@ public class TechnicalAccountLineClient {
     private static final String BASE_PATH =
             "/internal/v1/contracts/{contractId}/technical-accounts/{accountId}/lines";
     private static final String LINE_PATH = BASE_PATH + "/{lineId}";
-
-    private static final Set<String> PREMIUM_TYPES = Set.of("PREMIUM");
-    private static final Set<String> LOSS_TYPES =
-            Set.of("LOSS", "PAID_LOSS", "OUTSTANDING_LOSS", "IBNR", "ALAE");
-    private static final Set<String> COMMISSION_TYPES = Set.of("COMMISSION");
 
     private final RestClient client;
     private final ObjectMapper mapper;
@@ -116,83 +112,140 @@ public class TechnicalAccountLineClient {
         }
         List<TechnicalAccountLine> items = view.lines() == null ? List.of()
                 : view.lines().stream().filter(Objects::nonNull).toList();
-        LineSummary.Totals computed = computedTotals(items);
-        WireTotals wire = wireTotals(view.totals());
+        Rollup computed = rollupLines(items);
+        Rollup wire = rollupWire(view.totals());
+        Rollup expertBuckets = rollupBuckets(view.bucketTotals());
+        Map<String, BigDecimal> details = new LinkedHashMap<>(computed.details());
+        details.putAll(wire.details());
         return new LineSummary(items, new LineSummary.Totals(
-                wire == null || wire.premium() == null ? computed.premium() : wire.premium(),
-                wire == null || wire.loss() == null ? computed.loss() : wire.loss(),
-                wire == null || wire.commission() == null
-                        ? computed.commission() : wire.commission(),
-                wire == null || wire.other() == null ? computed.other() : wire.other()));
+                firstNonNull(expertBuckets.premium(), wire.premium(), computed.premium()),
+                firstNonNull(expertBuckets.loss(), wire.loss(), computed.loss()),
+                firstNonNull(expertBuckets.commission(), wire.commission(), computed.commission()),
+                firstNonNull(expertBuckets.other(), wire.other(), computed.other()),
+                details));
+    }
+
+    private static BigDecimal firstNonNull(BigDecimal first, BigDecimal second, BigDecimal third) {
+        return first != null ? first : second != null ? second : third;
+    }
+
+    /** @return the parsed amount, or null for a blank or non-numeric value */
+    private static BigDecimal amount(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return new BigDecimal(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     /**
-     * Maps the expert's totals map into the public buckets. The expert keys the
-     * map by line type, using either its four header components or the SPEC
-     * detail types; every type rolls into exactly one bucket. A missing bucket
-     * is left null so {@link #normalize} can derive it from the lines.
+     * Reads the expert's authoritative bucket totals. They are already rolled
+     * up by the expert's line-type mapping, so the domain prefers them over a
+     * local roll-up; a missing bucket falls back to the detail totals and then
+     * to the line rows.
      */
-    private static WireTotals wireTotals(Map<String, String> totals) {
+    private static Rollup rollupBuckets(Map<String, String> totals) {
         if (totals == null || totals.isEmpty()) {
-            return null;
+            return Rollup.empty();
         }
         BigDecimal premium = null;
         BigDecimal loss = null;
         BigDecimal commission = null;
         BigDecimal other = null;
         for (Map.Entry<String, String> entry : totals.entrySet()) {
-            String value = entry.getValue();
-            if (value == null || value.isBlank()) {
+            BigDecimal amount = amount(entry.getValue());
+            if (amount == null) {
                 continue;
             }
-            BigDecimal amount;
-            try {
-                amount = new BigDecimal(value.trim());
-            } catch (NumberFormatException ex) {
+            String bucket = TechnicalAccountLineTypes.normalize(entry.getKey());
+            if (bucket == null) {
                 continue;
             }
-            String type = entry.getKey() == null
-                    ? "" : entry.getKey().trim().toUpperCase(Locale.ROOT);
-            if (PREMIUM_TYPES.contains(type)) {
-                premium = premium == null ? amount : premium.add(amount);
-            } else if (LOSS_TYPES.contains(type)) {
-                loss = loss == null ? amount : loss.add(amount);
-            } else if (COMMISSION_TYPES.contains(type)) {
-                commission = commission == null ? amount : commission.add(amount);
-            } else {
-                other = other == null ? amount : other.add(amount);
+            switch (bucket) {
+                case TechnicalAccountLineTypes.PREMIUM -> premium = add(premium, amount);
+                case TechnicalAccountLineTypes.LEGACY_LOSS -> loss = add(loss, amount);
+                case TechnicalAccountLineTypes.COMMISSION -> commission = add(commission, amount);
+                case TechnicalAccountLineTypes.OTHER -> other = add(other, amount);
+                default -> {
+                    // A bucket outside the four names is not part of the contract.
+                }
             }
         }
-        return new WireTotals(premium, loss, commission, other);
+        return new Rollup(premium, loss, commission, other, Map.of());
     }
 
     /**
-     * Derives the four statement buckets from the lines. The expert normally
-     * sends the totals, so this is the fallback for a projection that omits
-     * them; every line type falls into premium, loss, commission, or other.
+     * Maps the expert's detailed totals map into the public buckets and keeps
+     * the per-line-type detail. The expert keys the map by line type; every
+     * type rolls into exactly one bucket according to the expert's mapping. A
+     * missing bucket is left null so {@link #normalize} can derive it from the
+     * authoritative bucket totals or the lines.
      */
-    private static LineSummary.Totals computedTotals(List<TechnicalAccountLine> items) {
+    private static Rollup rollupWire(Map<String, String> totals) {
+        if (totals == null || totals.isEmpty()) {
+            return Rollup.empty();
+        }
+        BigDecimal premium = null;
+        BigDecimal loss = null;
+        BigDecimal commission = null;
+        BigDecimal other = null;
+        Map<String, BigDecimal> details = new LinkedHashMap<>();
+        for (Map.Entry<String, String> entry : totals.entrySet()) {
+            BigDecimal amount = amount(entry.getValue());
+            if (amount == null) {
+                continue;
+            }
+            String type = TechnicalAccountLineTypes.normalize(entry.getKey());
+            if (type == null) {
+                continue;
+            }
+            details.merge(type, amount, BigDecimal::add);
+            switch (TechnicalAccountLineTypes.bucketOf(type)) {
+                case PREMIUM -> premium = add(premium, amount);
+                case LOSS -> loss = add(loss, amount);
+                case COMMISSION -> commission = add(commission, amount);
+                case OTHER -> other = add(other, amount);
+            }
+        }
+        return new Rollup(premium, loss, commission, other, details);
+    }
+
+    /**
+     * Derives the four statement buckets and the detailed totals from the
+     * lines. The expert normally sends the totals, so this is the fallback for
+     * a projection that omits them; every line type falls into premium, loss,
+     * commission, or other.
+     */
+    private static Rollup rollupLines(List<TechnicalAccountLine> items) {
         BigDecimal premium = BigDecimal.ZERO;
         BigDecimal loss = BigDecimal.ZERO;
         BigDecimal commission = BigDecimal.ZERO;
         BigDecimal other = BigDecimal.ZERO;
+        Map<String, BigDecimal> details = new LinkedHashMap<>();
         for (TechnicalAccountLine line : items) {
             if (line.amount() == null) {
                 continue;
             }
-            String type = line.lineType() == null
-                    ? "" : line.lineType().trim().toUpperCase(Locale.ROOT);
-            if (PREMIUM_TYPES.contains(type)) {
-                premium = premium.add(line.amount());
-            } else if (LOSS_TYPES.contains(type)) {
-                loss = loss.add(line.amount());
-            } else if (COMMISSION_TYPES.contains(type)) {
-                commission = commission.add(line.amount());
-            } else {
-                other = other.add(line.amount());
+            String type = TechnicalAccountLineTypes.normalize(line.lineType());
+            if (type == null) {
+                type = TechnicalAccountLineTypes.OTHER;
+            }
+            details.merge(type, line.amount(), BigDecimal::add);
+            switch (TechnicalAccountLineTypes.bucketOf(type)) {
+                case PREMIUM -> premium = premium.add(line.amount());
+                case LOSS -> loss = loss.add(line.amount());
+                case COMMISSION -> commission = commission.add(line.amount());
+                case OTHER -> other = other.add(line.amount());
             }
         }
-        return new LineSummary.Totals(premium, loss, commission, other);
+        return new Rollup(premium, loss, commission, other, details);
+    }
+
+    private static BigDecimal add(BigDecimal current, BigDecimal amount) {
+        return current == null ? amount : current.add(amount);
     }
 
     private RuntimeException translate(RestClientResponseException ex) {
@@ -235,16 +288,24 @@ public class TechnicalAccountLineClient {
     record ExpertLineSummary(
             UUID accountId,
             List<TechnicalAccountLine> lines,
-            Map<String, String> totals
+            Map<String, String> totals,
+            Map<String, String> bucketTotals
     ) {
     }
 
-    /** Per-bucket wire totals; a null bucket means the expert omitted it. */
-    private record WireTotals(
+    /**
+     * Roll-up of the expert totals or the line rows. A null bucket means the
+     * expert omitted it; the detailed map keeps the per-type amounts.
+     */
+    private record Rollup(
             BigDecimal premium,
             BigDecimal loss,
             BigDecimal commission,
-            BigDecimal other
+            BigDecimal other,
+            Map<String, BigDecimal> details
     ) {
+        private static Rollup empty() {
+            return new Rollup(null, null, null, null, Map.of());
+        }
     }
 }

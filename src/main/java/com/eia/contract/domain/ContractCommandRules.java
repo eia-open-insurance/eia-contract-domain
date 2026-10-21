@@ -67,7 +67,7 @@ final class ContractCommandRules {
             "DRAFT", "ISSUED", "AGREED", "SETTLED", "DISPUTED", "SUPERSEDED");
 
     static final Set<String> TECHNICAL_ACCOUNT_LINE_TYPES =
-            Set.of("PREMIUM", "LOSS", "COMMISSION", "OTHER");
+            TechnicalAccountLineTypes.DETAIL_TYPES;
 
     static final Set<String> CASH_CALL_STATUSES = Set.of("ISSUED", "SETTLED", "CANCELLED");
 
@@ -250,13 +250,18 @@ final class ContractCommandRules {
     }
 
     /**
-     * A technical-account line names one header component and a positive
-     * amount; the optional source reference and description are bounded by the
-     * column widths. The account status guard, line ordering, and the
-     * reconciliation against the account totals stay in the expert.
+     * A technical-account line names one implemented SPEC line type and a
+     * positive amount; the optional source reference and description are
+     * bounded by the column widths. The account status guard, line ordering,
+     * and the reconciliation against the account totals stay in the expert.
      */
     static void validate(CreateTechnicalAccountLineCommand command) {
-        oneOf(TECHNICAL_ACCOUNT_LINE_TYPES, command.lineType(), "lineType", true);
+        if (!TechnicalAccountLineTypes.accepts(command.lineType())) {
+            throw new ContractValidationException("INVALID_LINE_TYPE", "lineType",
+                    command.lineType() == null || command.lineType().isBlank()
+                            ? "lineType is required"
+                            : "Unknown lineType: " + command.lineType());
+        }
         BigDecimal amount = money(command.amount(), "amount", true);
         if (amount.signum() == 0) {
             throw new ContractValidationException("INVALID_AMOUNT", "amount",

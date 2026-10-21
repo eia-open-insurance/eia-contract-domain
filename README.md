@@ -38,12 +38,19 @@ optional `notes`; it starts `RECEIVED` and its status then moves only to
 `amount`, `currency`, `dueDate`, and optional `notes`; the expert assigns the
 call number, the call starts `REQUESTED`, and the status then moves only to
 `ISSUED`, `SETTLED`, or `CANCELLED` (with `REQUESTED` rejected as a target).
-A technical-account line records one header component (`lineType`: `PREMIUM`,
-`LOSS`, `COMMISSION`, or `OTHER`), optional `reference` and `description`, and
-a positive `amount`; `GET .../lines` returns the lines plus `totals` for
-premium, loss, commission, and other, and `DELETE .../lines/{lineId}` removes a
-line. The expert owns the DRAFT-only line write guard, the line ordering, and
-the reconciliation against the account.
+A technical-account line records one SPEC line type (`lineType`: `PREMIUM`,
+`COMMISSION`, `BROKERAGE`, `PAID_LOSS`, `OUTSTANDING_LOSS`, `IBNR`, `ALAE`,
+`REINSTATEMENT`, `CASH_CALL`, `FUNDS_WITHHELD`, `TAX`, `ADJUSTMENT`, or
+`OTHER`), optional `reference` and `description`, and a positive `amount`;
+`GET .../lines` returns the lines plus `totals` for premium, loss, commission,
+and other, and an optional detailed per-type map, and
+`DELETE .../lines/{lineId}` removes a line. The expert owns the DRAFT-only line
+write guard, the line ordering, and the reconciliation against the account.
+`BROKERAGE` rolls into commission; `REINSTATEMENT` and `CASH_CALL` roll into
+loss; funds withheld, tax, adjustment, and other roll into other.
+The retired aggregate `LOSS` line type is rejected on create; the expert
+migrates stored `LOSS` rows to `PAID_LOSS`, and the domain still maps a legacy
+`LOSS` total into the loss bucket when reading an older projection.
 
 `GET /api/v1/contracts/search?q=<term>&limit=10` returns the shared shell search
 projection (`query`, `limit`, `items[]` with `id`, `type`, `label`, `secondary`,

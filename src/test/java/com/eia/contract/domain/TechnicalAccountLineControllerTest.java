@@ -9,7 +9,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -64,6 +66,50 @@ class TechnicalAccountLineControllerTest {
     }
 
     @Test
+    void listsTheDetailedTotalsAlongsideTheFourBuckets() throws Exception {
+        Map<String, BigDecimal> details = new LinkedHashMap<>();
+        details.put("PREMIUM", new BigDecimal("100.0000"));
+        details.put("PAID_LOSS", new BigDecimal("40.0000"));
+        details.put("OUTSTANDING_LOSS", new BigDecimal("10.0000"));
+        details.put("IBNR", new BigDecimal("7.0000"));
+        details.put("ALAE", new BigDecimal("3.0000"));
+        details.put("COMMISSION", new BigDecimal("3.0000"));
+        details.put("BROKERAGE", new BigDecimal("2.0000"));
+        details.put("REINSTATEMENT", new BigDecimal("5.0000"));
+        details.put("CASH_CALL", new BigDecimal("1.0000"));
+        details.put("FUNDS_WITHHELD", new BigDecimal("1.5000"));
+        details.put("TAX", new BigDecimal("1.0000"));
+        details.put("ADJUSTMENT", new BigDecimal("2.5000"));
+        details.put("OTHER", new BigDecimal("0.5000"));
+        when(service.findAll(TENANT, CONTRACT_ID, ACCOUNT_ID))
+                .thenReturn(new LineSummary(List.of(line()), new LineSummary.Totals(
+                        new BigDecimal("100.0000"), new BigDecimal("66.0000"),
+                        new BigDecimal("5.0000"), new BigDecimal("5.5000"), details)));
+
+        mvc.perform(get(LINES, CONTRACT_ID, ACCOUNT_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totals.premium").value("100.0000"))
+                .andExpect(jsonPath("$.totals.loss").value("66.0000"))
+                .andExpect(jsonPath("$.totals.commission").value("5.0000"))
+                .andExpect(jsonPath("$.totals.other").value("5.5000"))
+                .andExpect(jsonPath("$.totals.details.PREMIUM").value("100.0000"))
+                .andExpect(jsonPath("$.totals.details.PAID_LOSS").value("40.0000"))
+                .andExpect(jsonPath("$.totals.details.OUTSTANDING_LOSS").value("10.0000"))
+                .andExpect(jsonPath("$.totals.details.IBNR").value("7.0000"))
+                .andExpect(jsonPath("$.totals.details.ALAE").value("3.0000"))
+                .andExpect(jsonPath("$.totals.details.COMMISSION").value("3.0000"))
+                .andExpect(jsonPath("$.totals.details.BROKERAGE").value("2.0000"))
+                .andExpect(jsonPath("$.totals.details.REINSTATEMENT").value("5.0000"))
+                .andExpect(jsonPath("$.totals.details.CASH_CALL").value("1.0000"))
+                .andExpect(jsonPath("$.totals.details.FUNDS_WITHHELD").value("1.5000"))
+                .andExpect(jsonPath("$.totals.details.TAX").value("1.0000"))
+                .andExpect(jsonPath("$.totals.details.ADJUSTMENT").value("2.5000"))
+                .andExpect(jsonPath("$.totals.details.OTHER").value("0.5000"));
+    }
+
+    @Test
     void createsLine() throws Exception {
         CreateTechnicalAccountLineCommand command = new CreateTechnicalAccountLineCommand(
                 "PREMIUM", "BOR-2026-0001", "Ceded premium Q1",
@@ -90,11 +136,11 @@ class TechnicalAccountLineControllerTest {
     }
 
     @Test
-    void acceptsLossAndOtherLineTypes() throws Exception {
+    void acceptsCommissionAndOtherLineTypes() throws Exception {
         when(service.create(eq(TENANT), eq(CONTRACT_ID), eq(ACCOUNT_ID),
                 any(CreateTechnicalAccountLineCommand.class)))
-                .thenReturn(new TechnicalAccountLine(LINE_ID, ACCOUNT_ID, "LOSS",
-                        "LOSS-2026-0001", "Q1 paid loss", new BigDecimal("250000.0000"),
+                .thenReturn(new TechnicalAccountLine(LINE_ID, ACCOUNT_ID, "COMMISSION",
+                        "COM-2026-0001", "Q1 ceding commission", new BigDecimal("250000.0000"),
                         CREATED_AT));
 
         mvc.perform(post(LINES, CONTRACT_ID, ACCOUNT_ID)
@@ -102,12 +148,12 @@ class TechnicalAccountLineControllerTest {
                         .header("X-EIA-Book", "ASSUMED")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"lineType": "LOSS", "reference": "LOSS-2026-0001",
-                                 "description": "Q1 paid loss", "amount": "250000.0000"}
+                                {"lineType": "COMMISSION", "reference": "COM-2026-0001",
+                                 "description": "Q1 ceding commission", "amount": "250000.0000"}
                                 """))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.lineType").value("LOSS"))
-                .andExpect(jsonPath("$.reference").value("LOSS-2026-0001"));
+                .andExpect(jsonPath("$.lineType").value("COMMISSION"))
+                .andExpect(jsonPath("$.reference").value("COM-2026-0001"));
 
         mvc.perform(post(LINES, CONTRACT_ID, ACCOUNT_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
@@ -120,13 +166,40 @@ class TechnicalAccountLineControllerTest {
     }
 
     @Test
-    void rejectsADetailLineTypeBeforeCallingTheExpert() throws Exception {
+    void acceptsEveryTechnicalAccountLineType() throws Exception {
+        when(service.create(eq(TENANT), eq(CONTRACT_ID), eq(ACCOUNT_ID),
+                any(CreateTechnicalAccountLineCommand.class)))
+                .thenAnswer(invocation -> {
+                    CreateTechnicalAccountLineCommand command = invocation.getArgument(3);
+                    return new TechnicalAccountLine(LINE_ID, ACCOUNT_ID, command.lineType(),
+                            "REF-" + command.lineType(), "Test " + command.lineType() + " line",
+                            command.amount(), CREATED_AT);
+                });
+
+        for (String lineType : List.of(
+                "PREMIUM", "COMMISSION", "BROKERAGE", "PAID_LOSS", "OUTSTANDING_LOSS",
+                "IBNR", "ALAE", "REINSTATEMENT", "CASH_CALL", "FUNDS_WITHHELD", "TAX",
+                "ADJUSTMENT", "OTHER")) {
+            mvc.perform(post(LINES, CONTRACT_ID, ACCOUNT_ID)
+                            .header("X-EIA-Tenant", TENANT.toString())
+                            .header("X-EIA-Book", "ASSUMED")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("""
+                                    {"lineType": "%s", "amount": "100.0000"}
+                                    """.formatted(lineType)))
+                    .andExpect(status().isCreated())
+                    .andExpect(jsonPath("$.lineType").value(lineType));
+        }
+    }
+
+    @Test
+    void rejectsTheRetiredLossLineTypeBeforeCallingTheExpert() throws Exception {
         mvc.perform(post(LINES, CONTRACT_ID, ACCOUNT_ID)
                         .header("X-EIA-Tenant", TENANT.toString())
                         .header("X-EIA-Book", "ASSUMED")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"lineType": "PAID_LOSS", "amount": "100.0000"}
+                                {"lineType": "LOSS", "amount": "250000.0000"}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_LINE_TYPE"));
