@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -64,6 +65,7 @@ class TechnicalAccountClientTest {
         assertThat(account.otherCharges()).isEqualByComparingTo("5000.0000");
         assertThat(account.balance()).isEqualByComparingTo("355000.0000");
         assertThat(account.status()).isEqualTo("ISSUED");
+        assertThat(account.settlementReference()).isNull();
         assertThat(account.createdAt()).isEqualTo(Instant.parse("2026-04-01T09:30:00Z"));
         server.verify();
     }
@@ -111,14 +113,60 @@ class TechnicalAccountClientTest {
                 .andExpect(header(TechnicalAccountClient.BOOK_HEADER, "ASSUMED"))
                 .andExpect(content().json("""
                         {"status": "SETTLED"}
-                        """))
-                .andRespond(withSuccess(accountJson().replace("\"ISSUED\"", "\"SETTLED\""),
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(accountJson("SETTLED", null),
                         MediaType.APPLICATION_JSON));
 
         TechnicalAccount account = client.updateStatus(TENANT, CONTRACT_ID, ACCOUNT_ID,
                 new UpdateTechnicalAccountStatusCommand("SETTLED"));
 
         assertThat(account.status()).isEqualTo("SETTLED");
+        assertThat(account.settlementReference()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void settlesTechnicalAccountForwardingTheSettlementReference() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TechnicalAccountClient client = new TechnicalAccountClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header(TechnicalAccountClient.TENANT_HEADER, TENANT.toString()))
+                .andExpect(header(TechnicalAccountClient.BOOK_HEADER, "ASSUMED"))
+                .andExpect(content().json("""
+                        {"status": "SETTLED", "reference": "STL-2026-0007"}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(accountJson("SETTLED", "STL-2026-0007"),
+                        MediaType.APPLICATION_JSON));
+
+        TechnicalAccount account = client.updateStatus(TENANT, CONTRACT_ID, ACCOUNT_ID,
+                new UpdateTechnicalAccountStatusCommand("SETTLED", "STL-2026-0007"));
+
+        assertThat(account.status()).isEqualTo("SETTLED");
+        assertThat(account.settlementReference()).isEqualTo("STL-2026-0007");
+        server.verify();
+    }
+
+    @Test
+    void omitsASettlementReferenceFromANonSettlementPayload() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        TechnicalAccountClient client = new TechnicalAccountClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(content().json("""
+                        {"status": "ISSUED"}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(accountJson("ISSUED", null),
+                        MediaType.APPLICATION_JSON));
+
+        TechnicalAccount account = client.updateStatus(TENANT, CONTRACT_ID, ACCOUNT_ID,
+                new UpdateTechnicalAccountStatusCommand("ISSUED", "STL-2026-0007"));
+
+        assertThat(account.status()).isEqualTo("ISSUED");
         server.verify();
     }
 
@@ -213,6 +261,13 @@ class TechnicalAccountClientTest {
     }
 
     private static String accountJson() {
+        return accountJson("ISSUED", null);
+    }
+
+    private static String accountJson(String status, String settlementReference) {
+        String reference = settlementReference == null
+                ? "null"
+                : "\"" + settlementReference + "\"";
         return """
                 {
                   "id": "%s",
@@ -227,10 +282,11 @@ class TechnicalAccountClientTest {
                   "commission": "100000.0000",
                   "otherCharges": "5000.0000",
                   "balance": "355000.0000",
-                  "status": "ISSUED",
+                  "status": "%s",
+                  "settlementReference": %s,
                   "createdAt": "2026-04-01T09:30:00Z"
                 }
-                """.formatted(ACCOUNT_ID, TENANT, CONTRACT_ID);
+                """.formatted(ACCOUNT_ID, TENANT, CONTRACT_ID, status, reference);
     }
 
     private static RestClient.Builder builder() {

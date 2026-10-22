@@ -16,7 +16,8 @@ import java.util.UUID;
  * <p>A technical account is the periodic financial statement of the treaty. The
  * expert owns production and the balance calculation; the domain proxies the
  * projection unchanged. Money is a decimal string (SPEC 10.3), and a positive
- * {@code balance} is due to the reinsurer.</p>
+ * {@code balance} is due to the reinsurer. {@code settlementReference} is
+ * carried only by a settled account.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record TechnicalAccount(
@@ -32,6 +33,7 @@ public record TechnicalAccount(
         @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal otherCharges,
         @JsonFormat(shape = JsonFormat.Shape.STRING) BigDecimal balance,
         String status,
+        String settlementReference,
         Instant createdAt
 ) {
 }

@@ -89,7 +89,7 @@ public class TechnicalAccountClient {
                             .build(contractId, accountId))
                     .header(TENANT_HEADER, tenantId.toString())
                     .header(BOOK_HEADER, BOOK)
-                    .body(command)
+                    .body(statusPayload(command))
                     .retrieve()
                     .body(TechnicalAccount.class);
             if (account == null) {
@@ -101,6 +101,23 @@ public class TechnicalAccountClient {
         } catch (ResourceAccessException ex) {
             throw unavailable(ex);
         }
+    }
+
+    /**
+     * A settlement reference is recorded only when the transition settles the
+     * account. The domain drops a reference supplied with any other target so
+     * the expert never sees settlement evidence on an issuance or dispute.
+     */
+    private static UpdateTechnicalAccountStatusCommand statusPayload(
+            UpdateTechnicalAccountStatusCommand command) {
+        if (command.reference() == null || settles(command.status())) {
+            return command;
+        }
+        return new UpdateTechnicalAccountStatusCommand(command.status());
+    }
+
+    private static boolean settles(String status) {
+        return status != null && "SETTLED".equalsIgnoreCase(status.trim());
     }
 
     private RuntimeException translate(RestClientResponseException ex) {

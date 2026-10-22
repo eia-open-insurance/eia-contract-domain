@@ -107,6 +107,28 @@ class TechnicalAccountControllerTest {
     }
 
     @Test
+    void settlesTechnicalAccountWithASettlementReference() throws Exception {
+        UpdateTechnicalAccountStatusCommand command =
+                new UpdateTechnicalAccountStatusCommand("SETTLED", "STL-2026-0007");
+        when(service.updateStatus(TENANT, CONTRACT_ID, ACCOUNT_ID, command))
+                .thenReturn(account("SETTLED", "STL-2026-0007"));
+
+        mvc.perform(patch(ACCOUNTS + "/{accountId}/status", CONTRACT_ID, ACCOUNT_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "SETTLED", "reference": "STL-2026-0007"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.accountId").value(ACCOUNT_ID.toString()))
+                .andExpect(jsonPath("$.status").value("SETTLED"))
+                .andExpect(jsonPath("$.settlementReference").value("STL-2026-0007"));
+
+        verify(service).updateStatus(TENANT, CONTRACT_ID, ACCOUNT_ID, command);
+    }
+
+    @Test
     void acceptsAnAbsentBookForCompatibility() throws Exception {
         when(service.findAll(TENANT, CONTRACT_ID)).thenReturn(List.of(account("ISSUED")));
 
@@ -293,10 +315,14 @@ class TechnicalAccountControllerTest {
     }
 
     private static TechnicalAccount account(String status) {
+        return account(status, null);
+    }
+
+    private static TechnicalAccount account(String status, String settlementReference) {
         return new TechnicalAccount(ACCOUNT_ID, "TA-2026-00077", CONTRACT_ID,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31), "USD",
                 new BigDecimal("400000.0000"), new BigDecimal("240000.0000"),
                 new BigDecimal("100000.0000"), new BigDecimal("5000.0000"),
-                new BigDecimal("355000.0000"), status, NOW);
+                new BigDecimal("355000.0000"), status, settlementReference, NOW);
     }
 }

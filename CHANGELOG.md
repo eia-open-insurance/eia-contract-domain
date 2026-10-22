@@ -24,6 +24,9 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
 - Technical-account proxy forwards the tenant and the ASSUMED book to the
   expert on every call and preserves the expert's `400`/`404`/`409` code and
   message; a supplied non-ASSUMED book is hidden as `404 BOOK_SCOPE_VIOLATION`.
+  A `SETTLED` status command may carry an optional `reference`; the client
+  forwards it only on settlement and the projection returns it as
+  `settlementReference`.
 - Technical-account line API:
   `GET/POST /api/v1/contracts/{contractId}/technical-accounts/{accountId}/lines`
   and `DELETE .../lines/{lineId}`. The proxy forwards the tenant and the ASSUMED

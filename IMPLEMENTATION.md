@@ -78,7 +78,9 @@ preconditions and approval are enforced.
   expert: `PREMIUM` is premium; `PAID_LOSS`, `OUTSTANDING_LOSS`, `IBNR`, `ALAE`,
   `REINSTATEMENT`, and `CASH_CALL` are loss; `COMMISSION` and `BROKERAGE` are
   commission; `FUNDS_WITHHELD`, `TAX`, `ADJUSTMENT`, and `OTHER` are other.
-  `DELETE .../lines/{lineId}` returns 204. The DRAFT-only write guard, the line
+  `DELETE .../lines/{lineId}` returns 204. The account status action accepts an
+  optional `reference`, forwards it only on a `SETTLED` transition, and projects
+  the expert's `settlementReference`. The DRAFT-only write guard, the line
   ordering, and the reconciliation against the account stay in the expert and
   surface as 409.
 - Security calls use the same book wall and forward the tenant and ASSUMED book
