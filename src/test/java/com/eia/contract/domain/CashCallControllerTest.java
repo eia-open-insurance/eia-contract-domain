@@ -105,6 +105,28 @@ class CashCallControllerTest {
     }
 
     @Test
+    void settlesCashCallWithASettlementReference() throws Exception {
+        UpdateCashCallStatusCommand command =
+                new UpdateCashCallStatusCommand("SETTLED", "STL-2026-0007");
+        when(service.updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID, command))
+                .thenReturn(cashCall("SETTLED", "STL-2026-0007"));
+
+        mvc.perform(patch(CASH_CALLS + "/{cashCallId}/status", CONTRACT_ID, CASH_CALL_ID)
+                        .header("X-EIA-Tenant", TENANT.toString())
+                        .header("X-EIA-Book", "ASSUMED")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"status": "SETTLED", "reference": "STL-2026-0007"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cashCallId").value(CASH_CALL_ID.toString()))
+                .andExpect(jsonPath("$.status").value("SETTLED"))
+                .andExpect(jsonPath("$.settlementReference").value("STL-2026-0007"));
+
+        verify(service).updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID, command);
+    }
+
+    @Test
     void acceptsAnAbsentBookForCompatibility() throws Exception {
         when(service.findAll(TENANT, CONTRACT_ID)).thenReturn(List.of(cashCall("REQUESTED")));
 
@@ -297,9 +319,13 @@ class CashCallControllerTest {
     }
 
     private static CashCall cashCall(String status) {
+        return cashCall(status, null);
+    }
+
+    private static CashCall cashCall(String status, String settlementReference) {
         return new CashCall(CASH_CALL_ID, "CC-2026-00042", CONTRACT_ID,
                 LocalDate.of(2026, 1, 1), LocalDate.of(2026, 3, 31),
                 new BigDecimal("250000.0000"), "USD", LocalDate.of(2026, 4, 15),
-                status, "Large loss funding", NOW);
+                status, settlementReference, "Large loss funding", NOW);
     }
 }

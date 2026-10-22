@@ -38,6 +38,8 @@ optional `notes`; it starts `RECEIVED` and its status then moves only to
 `amount`, `currency`, `dueDate`, and optional `notes`; the expert assigns the
 call number, the call starts `REQUESTED`, and the status then moves only to
 `ISSUED`, `SETTLED`, or `CANCELLED` (with `REQUESTED` rejected as a target).
+A settlement may carry an optional `reference`, forwarded only on the `SETTLED`
+transition and projected as `settlementReference`.
 A technical-account line records one SPEC line type (`lineType`: `PREMIUM`,
 `COMMISSION`, `BROKERAGE`, `PAID_LOSS`, `OUTSTANDING_LOSS`, `IBNR`, `ALAE`,
 `REINSTATEMENT`, `CASH_CALL`, `FUNDS_WITHHELD`, `TAX`, `ADJUSTMENT`, or

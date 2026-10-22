@@ -87,7 +87,7 @@ public class CashCallClient {
                             .build(contractId, cashCallId))
                     .header(TENANT_HEADER, tenantId.toString())
                     .header(BOOK_HEADER, BOOK)
-                    .body(command)
+                    .body(statusPayload(command))
                     .retrieve()
                     .body(CashCall.class);
             if (cashCall == null) {
@@ -99,6 +99,22 @@ public class CashCallClient {
         } catch (ResourceAccessException ex) {
             throw unavailable(ex);
         }
+    }
+
+    /**
+     * A settlement reference is recorded only when the transition settles the
+     * call. The domain drops a reference supplied with any other target so the
+     * expert never sees settlement evidence on an issuance or cancellation.
+     */
+    private static UpdateCashCallStatusCommand statusPayload(UpdateCashCallStatusCommand command) {
+        if (command.reference() == null || settles(command.status())) {
+            return command;
+        }
+        return new UpdateCashCallStatusCommand(command.status());
+    }
+
+    private static boolean settles(String status) {
+        return status != null && "SETTLED".equalsIgnoreCase(status.trim());
     }
 
     private RuntimeException translate(RestClientResponseException ex) {

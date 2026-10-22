@@ -58,9 +58,11 @@ preconditions and approval are enforced.
   `dueDate`, and optional `notes`; the amount must be strictly positive, the
   period ordered, the currency an ISO code, and the due date present. The expert
   assigns the call number and starts the call `REQUESTED`; the domain accepts
-  only `ISSUED`, `SETTLED`, or `CANCELLED` as a status target. The client uses
-  the expert's `/internal/v1/contracts/{contractId}/cash-calls` API, which maps
-  to the same controller as the public cash-call path.
+  only `ISSUED`, `SETTLED`, or `CANCELLED` as a status target. A `SETTLED`
+  command may carry an optional `reference`; the client forwards it only on
+  settlement and the projection returns it as `settlementReference`. The client
+  uses the expert's `/internal/v1/contracts/{contractId}/cash-calls` API, which
+  maps to the same controller as the public cash-call path.
 - Technical-account line calls use the same book wall and forward the tenant and
   ASSUMED book to the expert's
   `/internal/v1/contracts/{contractId}/technical-accounts/{accountId}/lines`

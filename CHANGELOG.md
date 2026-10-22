@@ -43,7 +43,9 @@ The format is based on Keep a Changelog and the project uses Semantic Versioning
   hidden as `404 BOOK_SCOPE_VIOLATION`. The projection carries the call number,
   contract, period, amount, currency, due date, status, notes, and creation
   time. A call starts `REQUESTED` and the domain accepts only `ISSUED`,
-  `SETTLED`, or `CANCELLED` as a status target.
+  `SETTLED`, or `CANCELLED` as a status target. A settlement accepts an optional
+  `reference`; the client forwards it only for `SETTLED` and the projection
+  returns it as `settlementReference`.
 - Security API: `GET/POST /api/v1/contracts/{contractId}/security` and
   `PATCH /api/v1/contracts/{contractId}/security/{securityId}/status`. The proxy
   forwards the tenant and the ASSUMED book on every call and preserves the

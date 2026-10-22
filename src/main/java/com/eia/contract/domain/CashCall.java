@@ -17,7 +17,8 @@ import java.util.UUID;
  * aggregate validation; the domain proxies the projection unchanged. Money is a
  * decimal string (SPEC 10.3). A cash call is created {@code REQUESTED} and moves
  * to {@code ISSUED} then {@code SETTLED}, or to {@code CANCELLED} while it is
- * still a request.</p>
+ * still a request. {@code settlementReference} is carried only by a settled
+ * call.</p>
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CashCall(
@@ -30,6 +31,7 @@ public record CashCall(
         String currency,
         LocalDate dueDate,
         String status,
+        String settlementReference,
         String notes,
         Instant createdAt
 ) {

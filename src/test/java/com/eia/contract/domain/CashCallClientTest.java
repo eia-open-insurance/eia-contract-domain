@@ -8,6 +8,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.json.MappingJackson2HttpMessageConverter;
+import org.springframework.test.json.JsonCompareMode;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -61,6 +62,7 @@ class CashCallClientTest {
         assertThat(cashCall.currency()).isEqualTo("USD");
         assertThat(cashCall.dueDate()).isEqualTo(LocalDate.of(2026, 4, 15));
         assertThat(cashCall.status()).isEqualTo("REQUESTED");
+        assertThat(cashCall.settlementReference()).isNull();
         assertThat(cashCall.notes()).isEqualTo("Large loss funding");
         assertThat(cashCall.createdAt()).isEqualTo(Instant.parse("2026-04-01T09:30:00Z"));
         server.verify();
@@ -92,6 +94,7 @@ class CashCallClientTest {
 
         assertThat(cashCall.callNumber()).isEqualTo("CC-2026-00042");
         assertThat(cashCall.status()).isEqualTo("REQUESTED");
+        assertThat(cashCall.settlementReference()).isNull();
         server.verify();
     }
 
@@ -107,14 +110,82 @@ class CashCallClientTest {
                 .andExpect(header(CashCallClient.BOOK_HEADER, "ASSUMED"))
                 .andExpect(content().json("""
                         {"status": "ISSUED"}
-                        """))
-                .andRespond(withSuccess(cashCallJson().replace("\"REQUESTED\"", "\"ISSUED\""),
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(cashCallJson("ISSUED", null),
                         MediaType.APPLICATION_JSON));
 
         CashCall cashCall = client.updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID,
                 new UpdateCashCallStatusCommand("ISSUED"));
 
         assertThat(cashCall.status()).isEqualTo("ISSUED");
+        assertThat(cashCall.settlementReference()).isNull();
+        server.verify();
+    }
+
+    @Test
+    void settlesCashCallForwardingTheSettlementReference() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CashCallClient client = new CashCallClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(header(CashCallClient.TENANT_HEADER, TENANT.toString()))
+                .andExpect(header(CashCallClient.BOOK_HEADER, "ASSUMED"))
+                .andExpect(content().json("""
+                        {"status": "SETTLED", "reference": "STL-2026-0007"}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(cashCallJson("SETTLED", "STL-2026-0007"),
+                        MediaType.APPLICATION_JSON));
+
+        CashCall cashCall = client.updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID,
+                new UpdateCashCallStatusCommand("SETTLED", "STL-2026-0007"));
+
+        assertThat(cashCall.status()).isEqualTo("SETTLED");
+        assertThat(cashCall.settlementReference()).isEqualTo("STL-2026-0007");
+        server.verify();
+    }
+
+    @Test
+    void omitsASettlementReferenceFromANonSettlementPayload() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CashCallClient client = new CashCallClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(content().json("""
+                        {"status": "ISSUED"}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(cashCallJson("ISSUED", null),
+                        MediaType.APPLICATION_JSON));
+
+        CashCall cashCall = client.updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID,
+                new UpdateCashCallStatusCommand("ISSUED", "STL-2026-0007"));
+
+        assertThat(cashCall.status()).isEqualTo("ISSUED");
+        server.verify();
+    }
+
+    @Test
+    void omitsAnAbsentSettlementReferenceFromASettlementPayload() {
+        RestClient.Builder builder = builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        CashCallClient client = new CashCallClient(builder, new ObjectMapper(), BASE);
+
+        server.expect(requestTo(STATUS + "?tenantId=" + TENANT))
+                .andExpect(method(HttpMethod.PATCH))
+                .andExpect(content().json("""
+                        {"status": "SETTLED"}
+                        """, JsonCompareMode.STRICT))
+                .andRespond(withSuccess(cashCallJson("SETTLED", null),
+                        MediaType.APPLICATION_JSON));
+
+        CashCall cashCall = client.updateStatus(TENANT, CONTRACT_ID, CASH_CALL_ID,
+                new UpdateCashCallStatusCommand("SETTLED"));
+
+        assertThat(cashCall.status()).isEqualTo("SETTLED");
+        assertThat(cashCall.settlementReference()).isNull();
         server.verify();
     }
 
@@ -210,6 +281,13 @@ class CashCallClientTest {
     }
 
     private static String cashCallJson() {
+        return cashCallJson("REQUESTED", null);
+    }
+
+    private static String cashCallJson(String status, String settlementReference) {
+        String reference = settlementReference == null
+                ? "null"
+                : "\"" + settlementReference + "\"";
         return """
                 {
                   "id": "%s",
@@ -221,11 +299,12 @@ class CashCallClientTest {
                   "amount": "250000.0000",
                   "currency": "USD",
                   "dueDate": "2026-04-15",
-                  "status": "REQUESTED",
+                  "status": "%s",
+                  "settlementReference": %s,
                   "notes": "Large loss funding",
                   "createdAt": "2026-04-01T09:30:00Z"
                 }
-                """.formatted(CASH_CALL_ID, TENANT, CONTRACT_ID);
+                """.formatted(CASH_CALL_ID, TENANT, CONTRACT_ID, status, reference);
     }
 
     private static RestClient.Builder builder() {
